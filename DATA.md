@@ -1,49 +1,34 @@
 # Data
 
-This file explains the project's **data sources** — where they come from, how to get them, and how to think about using them. It is the contextual companion to the [`data/`](data/) folder.
+This file explains **PlayPulse's** suggested data sources — where they come from, how to get them, and how to think about using them.
 
-> **`DATA.md` is tracked in git. The `data/` folder is not.** Documentation about the data lives here, in version control, so the whole team shares one understanding. The datasets themselves live in `data/`, which is **git-ignored** — raw data is often large, private, or licensed, and must never be committed. Clone the repo, then populate `data/` locally by following the sources below.
+> **`DATA.md` is tracked in git. The `data/` folder is not.** Raw data is often large or governed by ToS, and must never be committed. Clone the repo, then populate `data/` locally.
 
-## Where to look for sources
-
-At the start of the project, before committing to a source, scan these in roughly this order:
-
-1. **A source the club or a sponsor already provides.** If the project came with data, that's your primary source — document it first.
-2. **Official / authoritative open data.** Government portals (e.g. data.gov), inter-governmental bodies, and official statistics agencies. Highest trust, usually well-documented, clear licensing.
-3. **Curated dataset hubs.** Kaggle, Hugging Face Datasets, UCI ML Repository, Google Dataset Search, AWS/Azure open-data registries. Fast to start with; check the license and provenance.
-4. **Domain-specific repositories / APIs.** Whatever is standard for the project's field (e.g. a scientific archive, a public API, a research consortium). Often the richest and most relevant.
-5. **First-party collection.** Surveys, scraping (only where permitted), or instrumentation you build. Highest effort and the most responsibility — get PM sign-off first.
-
-## How to think about using a source (high level)
-
-Before you rely on a dataset, a member should be able to answer these — and record the answers in the source's row below:
-
-- **License & permission.** Are we allowed to use it for this purpose, and to share results? If unclear, ask a PM before building on it.
-- **Provenance.** Who produced it, when, and how? Freshness and collection method shape what conclusions are valid.
-- **Fitness.** Does it actually measure what the project needs? Coverage, granularity, and sample size matter more than size.
-- **Sensitivity.** Any PII, confidential, or ethically sensitive content? If yes, that dictates storage and handling — and it stays out of git regardless.
-- **Reproducibility.** Can a teammate re-fetch it from your notes alone? If not, the source isn't documented well enough yet.
-
-Choosing and vetting a source is a **judgment call** — surface it to a PM rather than deciding a major data direction alone.
-
-## Source register
-
-Document every source here as you adopt it. Replace these placeholders.
+## Suggested sources (starting point)
 
 | Source | Origin / URL | Access method | License | Sensitivity | Notes |
 |--------|--------------|---------------|---------|-------------|-------|
-| _e.g. Example Open Dataset_ | `https://…` | Manual download → `data/raw/` | CC-BY-4.0 | None | Updated annually |
-| | | | | | |
+| NBA Stats API (unofficial) | https://github.com/swar/nba_api | `pip install nba_api` | Unofficial — respect rate limits | None | Box scores, play-by-play, shot charts back to the 1940s |
+| Basketball-Reference | https://www.basketball-reference.com | HTML scrape via `basketball_reference_scraper` | Personal / educational use — **respect robots.txt** | None | Great for advanced stats and coaches / historical detail |
+| Kaggle NBA datasets | https://www.kaggle.com/datasets?search=nba | Kaggle download | Per-dataset | None | Pre-assembled CSVs — fine for prototyping, verify vintage |
+| NBA API stats.nba.com direct | https://stats.nba.com | HTTP (via `nba_api`) | Unofficial | None | Same source `nba_api` wraps; go here only if the wrapper misses an endpoint |
+
+## How to think about using each source
+
+- **Rate limits.** `nba_api` and stats.nba.com will hard-block a naive scraper. Use the wrapper's built-in throttling and cache aggressively to `data/raw/`.
+- **Vintage.** NBA definitions change (e.g., how "assist" is scored). If you're comparing eras, note it.
+- **Fitness.** Play-by-play is huge but noisy. Box scores are compact and usually enough for v1.
+- **License / ToS.** The NBA hasn't published a formal API license — stay conservative: don't republish full raw dumps, don't build anything commercial off this repo.
+
+Choosing and vetting a source is a **judgment call** — surface it to a PM rather than deciding a major data direction alone.
 
 ## Local layout convention
 
-The `data/` folder is git-ignored, but keep a consistent structure inside it so everyone's local copy matches:
-
 ```
 data/
-├── raw/          # exactly as downloaded — never edit by hand
-├── interim/      # partially processed, intermediate outputs
-└── processed/    # analysis-ready, produced by the cleaning pipeline
+├── raw/          # exactly as fetched from the API — never edit by hand
+├── interim/      # cleaned + joined game logs, per-season parquets
+└── processed/    # feature tables and model-ready splits
 ```
 
 Because `data/` isn't in git, the **pipeline that fetches and builds these folders** is what must be committed and reproducible — not the data itself.
