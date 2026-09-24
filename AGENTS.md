@@ -22,11 +22,11 @@
 
 ## 1. What this repo is
 
-This is an **IDE Data Science Club project template**. A team of PMs and members runs a data-science project out of it. The files an agent works with:
+This is an **ADSC Catalyst Project**. A team of PMs and members runs a data-science project out of it. The files an agent works with:
 
 | File / folder | What the agent uses it for |
 |---|---|
-| [`README.md`](README.md) | One-page overview of the template. Read once for orientation. |
+| [`README.md`](README.md) | One-page overview of the project. Read once for orientation. |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | The human workflow. Honor it — don't re-explain it back to the user. |
 | [`DELIVERABLES.md`](DELIVERABLES.md) | The living plan of what the project will ship. Update when a deliverable is added, split, or resequenced. |
 | [`DATA.md`](DATA.md) | Documentation of data sources. Update whenever a new source is adopted. |
@@ -72,8 +72,8 @@ Features live on their own branches. The agent's rules for staying on the right 
 - **Never work directly on `main`.** If the user asks you to edit code on `main`, stop and ask which branch to use.
 - **One task, one branch.** Work on the branch dedicated to the task's feature. If the branch doesn't exist yet, create one under the appropriate namespace and confirm the name with the user.
 - **Match branch conventions.** Look at existing branches (`git branch -a`) and mirror the naming shape. If nothing's established, propose a scheme and get user approval before creating branches.
-- **Small commits, meaningful messages.** Each commit should be one coherent step, with a message that says *why* — not just *what*.
-- **Push your work** so the user can see it. Don't sit on uncommitted or unpushed changes for long stretches.
+- **Humans own commits and pushes.** Do not commit or push changes unless the user explicitly asks you to. Leave completed changes in the working tree for a team member to review before they are committed.
+- **Prepare work for human review.** Keep changes focused and clearly summarize what was changed so the member can review the diff before committing it.
 - **Stay in your lane.** Don't pull in unrelated changes from another feature branch just because they're convenient. Keep the feature's history clean.
 - **How work moves between branches is a human decision.** Don't merge branches, rebase across them, or delete them unless the user explicitly asks.
 
@@ -136,6 +136,7 @@ The agent MUST NOT:
 - Adopt a new data source, add a dependency, or make an architectural change without confirming per [§7](#7-when-to-decide-vs-ask).
 - Remove `data/` or `.planning/` from `.gitignore`.
 - Re-explain the human workflow ([`CONTRIBUTING.md`](CONTRIBUTING.md)) back to the user unprompted.
+- Commit or push changes unless the user explicitly asks for that specific action. Human review should normally happen before code enters git history.
 
 ---
 
@@ -150,12 +151,12 @@ Before starting a task:
 
 While working:
 - [ ] On a feature branch, not `main`.
-- [ ] Small, coherent commits with meaningful messages.
+- [ ] Changes are focused and ready for human review before committing.
 - [ ] No files committed under `data/`.
 - [ ] No new dependencies, sources, or architectural changes made silently.
 - [ ] Related docs updated ([`DELIVERABLES.md`](DELIVERABLES.md), [`DATA.md`](DATA.md)) in the same change when relevant.
 
 When finishing:
 - [ ] Acceptance criteria met.
-- [ ] Pushed the branch.
+- [ ] Left changes ready for human review, commit, and push.
 - [ ] Summarized what changed, what was left out, and any items still awaiting a user decision.
