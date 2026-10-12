@@ -26,9 +26,18 @@ venv/
 .env
 .ipynb_checkpoints/
 
-# Generated local artifacts (keep the explicit shareable assignment PDF tracked)
+# Generated local artifacts
 .pytest_cache/
 *.egg-info/
 .streamlit/secrets.toml
 .env.*
 *.log
+
+# Share the empty configuration example; keep local credentials ignored.
+!.env.example
+
+# Local database files/backups (Compose uses a Docker-managed named volume).
+pgdata/
+postgres-data/
+*.dump
+*.backup

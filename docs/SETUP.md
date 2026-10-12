@@ -1,107 +1,148 @@
 # CourtIQ development setup
 
-Use **Python 3.12** and one repository-local `.venv` for scripts, notebooks and Streamlit. `.python-version` records the target; it does not install Python. Install Python 3.12 from [python.org](https://www.python.org/downloads/) first, and install [Git](https://git-scm.com/downloads). On Windows, enable the Python installer option to add Python to PATH. You do not need PostgreSQL, Docker, an NBA account or API access for onboarding.
+Use this guide from your **member worktree root**, the folder containing `requirements.txt` and `compose.yaml`. [Week 0](../weekly/week0/week-00-onboarding.md#1-get-the-project-and-your-branch) explains how to get that worktree. Run commands one at a time in PowerShell on Windows or Terminal on macOS/Linux.
 
-## 1. Clone
+**Python scripts and Streamlit run locally in one `.venv`. Docker runs only PostgreSQL.** Jupyter, if used later, also stays in the local Python environment; this assignment uses a regular script and does not require Jupyter. Week 0 requires a healthy database and `SELECT 1;`, not tables, a schema, ingestion or an app/database connection.
 
-Run in a terminal (PowerShell on Windows; Terminal on macOS/Linux):
+## 1. Local Python environment
 
-```sh
-git clone https://github.com/TAMU-Aggie-Data-Science-Club/fall2026-courtiq.git
-cd fall2026-courtiq
-```
+Install [Python 3.12](https://www.python.org/downloads/) and [Git](https://git-scm.com/downloads/). On Windows, enable the Python launcher (`py`) and PATH options, then reopen the terminal.
 
-These instructions describe the starter files after the PM makes them available. During local PM review, use the existing feature checkout instead of cloning; the files are not yet on GitHub.
-
-## 2. Create and activate the environment
-
-### Windows — PowerShell
+Windows PowerShell:
 
 ```powershell
-py -3.12 --version
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-If PowerShell blocks activation, allow scripts **for this terminal only**, then retry:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
-```
-
-Alternatively use Command Prompt: `.venv\Scripts\activate.bat`.
-
-### macOS — Terminal
+macOS/Linux:
 
 ```sh
-python3.12 --version
 python3.12 -m venv .venv
 source .venv/bin/activate
 ```
 
-### Linux — Terminal
+On all platforms, after activation:
 
 ```sh
-python3.12 --version
-python3.12 -m venv .venv
-source .venv/bin/activate
-```
-
-Your distribution may require its Python 3.12 venv package (for example `python3.12-venv` on a distribution that provides it). If Python 3.12 is unavailable in your distribution's package manager, use your supported Python installation method or ask a PM; do not substitute another Python version silently.
-
-## 3. Install and verify
-
-All commands below work on the three platforms after activation. Run from the repository root:
-
-```sh
-python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 python scripts/verify_environment.py
 python -m pip check
 ```
 
-The verifier prints Python 3.12, the active interpreter path, each pinned package version and `PASS`. `pip check` should print `No broken requirements found.` It checks imports and makes a local Plotly figure; it does not fetch NBA data or complete the exercise.
+Expect `PASS` and `No broken requirements found.` Use this same `.venv` for all project Python commands. In each new terminal, activate the existing environment again rather than creating another one.
 
-Direct dependencies are pinned; transitive dependencies are resolved by pip, so this is not a fully locked environment. PostgreSQL drivers and stretch ML packages are deliberately deferred until their work is approved.
+## 2. Install and start Docker
 
-### Verification scope of this starter
+Docker runs a **container**, an isolated process containing PostgreSQL. Compose reads [compose.yaml](../compose.yaml) to start it with the same settings for everyone.
 
-The pinned environment was installed and verified on **macOS, Apple Silicon, Python 3.12.12**. Package imports, `pip check`, a Jupyter server and kernel, privately completed notebook execution/interactive chart HTML, Streamlit startup and all four navigation selections passed. Windows and Linux commands are documented but were not executed on those platforms. Browser interaction was not manually checked; members must confirm the notebook chart renders in their own browser. No live NBA connectivity or PostgreSQL functionality was tested or implemented.
+- **Windows:** follow [Docker Desktop for Windows](https://docs.docker.com/desktop/setup/install/windows-install/). Use its Linux-container/WSL 2 setup, complete any required restart, and launch Docker Desktop. If Windows asks for WSL or virtualization setup, follow the installer/documented steps; ask a PM if your machine is restricted.
+- **macOS:** follow [Docker Desktop for Mac](https://docs.docker.com/desktop/setup/install/mac-install/). Choose Apple silicon or Intel to match your Mac (Apple menu → About This Mac), install the app and launch it.
+- **Linux:** follow [Docker Desktop for Linux](https://docs.docker.com/desktop/setup/install/linux/) for your supported distribution. If you already use Docker Engine, ensure its service and the [Compose plugin](https://docs.docker.com/compose/install/linux/) are installed/running instead; an extra Desktop installation is unnecessary.
 
-## 4. Run Jupyter with the same environment
+Wait until Docker Desktop reports its engine is running, then verify in a new terminal:
 
 ```sh
-python -m ipykernel install --sys-prefix --name courtiq --display-name "CourtIQ (Python 3.12)"
-python -m notebook
+docker version
+docker compose version
 ```
 
-Registration stays inside `.venv`. Open `notebooks/00_onboarding.ipynb`, or your member copy described in [Deliverable 0](../weekly/week-00-onboarding.md). Choose **Kernel → Change Kernel → CourtIQ (Python 3.12)** if necessary. A notebook cell containing `import sys; print(sys.executable)` should point into this repository's `.venv`. The verification script alone does not prove that your browser/kernel works: run the notebook imports and confirm its chart appears.
+`docker version` must show both **Client** and **Server** sections. The Client alone means the engine is not running/reachable. Use the current `docker compose` command with a space, not the old standalone `docker-compose` command.
 
-The terminal prints a local browser URL. Treat its token as private; do not include it in screenshots or GitHub. Stop the notebook server with Ctrl+C (confirm shutdown if prompted).
+## 3. Create your private database settings
 
-## 5. Run the application
+From the worktree root with `.venv` active, copy [.env.example](../.env.example) safely:
 
-In a second terminal at the same repository root, activate the **existing** `.venv` using the command for your platform, then run:
+```sh
+python -c "from pathlib import Path; Path('.env').open('x').write(Path('.env.example').read_text())"
+```
+
+If this reports `FileExistsError`, keep your existing `.env` and open it instead. Edit the `.env` file in a text editor and set `POSTGRES_PASSWORD` to a new local-only password (letters/digits are easiest for this exercise). Keep `POSTGRES_USER=courtiq` and `POSTGRES_DB=courtiq` for the commands below. This is a development database password, not your GitHub or university password.
+
+`.env` is ignored by Git; `.env.example` contains no password and is shareable. Do not paste the `.env` contents into PRs or screenshots. The database port defaults to `127.0.0.1:5432`; if that port is occupied, set `POSTGRES_PORT=5433` in `.env`. Docker's PostgreSQL port inside the container remains 5432.
+
+## 4. Start PostgreSQL and verify it
+
+From the same worktree root:
+
+```sh
+docker compose config -q
+docker compose up -d
+docker compose ps
+```
+
+`config -q` validates the configuration without printing your password. `up -d` downloads the PostgreSQL image on the first run and starts it in the background. Run `ps` again after a short wait until the `postgres` service shows **healthy**. First image download/initialization can take several minutes on a slow connection. Leave Docker Desktop running while you use the database.
+
+Run a query using the `psql` client already inside the container:
+
+```sh
+docker compose exec postgres psql -U courtiq -d courtiq
+```
+
+You should see the `courtiq=#` SQL prompt. Type this SQL and press Enter:
+
+```sql
+SELECT 1;
+```
+
+Expect a result containing `1` and `(1 row)`. The semicolon ends the SQL statement. Exit this SQL prompt with:
+
+```text
+\q
+```
+
+You are now back at your normal terminal. For a one-command verification, this equivalent command also works:
+
+```sh
+docker compose exec -T postgres psql -U courtiq -d courtiq -c "SELECT 1;"
+```
+
+Take screenshots of the healthy `docker compose ps` result and the successful query for your onboarding PR. There is no database coding or data loading task yet.
+
+## 5. Stop safely and understand persistence
+
+When done:
+
+```sh
+docker compose stop
+docker compose ps -a
+```
+
+The service should be stopped/exited. Start it again with `docker compose up -d`. Docker stores its database files in a **named volume** called `<project>_postgres_data` (`courtiq_postgres_data` with the sample project name), outside the Git working tree. Stopping or restarting preserves those files.
+
+If you want to remove the stopped container/network while keeping the database:
+
+```sh
+docker compose down
+```
+
+Do **not** add `-v`/`--volumes`: that deletes the persistent database volume. Do not run a volume prune to troubleshoot. Changing user/database/password in `.env` after the first initialization does not change existing database credentials; ask a PM before altering credentials or resetting a volume. [PostgreSQL image behavior](https://hub.docker.com/_/postgres), [Compose shutdown reference](https://docs.docker.com/reference/cli/docker/compose/down/).
+
+## 6. Run the local application
+
+With `.venv` active:
 
 ```sh
 python -m streamlit run app.py
 ```
 
-Open `http://localhost:8501`. Select Players, Teams, Compare and Trends in the sidebar. Each page describes planned functionality and explicitly states that no statistics are loaded. Stop with Ctrl+C. To leave the environment, run `deactivate`.
+Open `http://localhost:8501` to inspect Players, Teams, Compare and Trends. The shell still shows planned placeholders and is not connected to PostgreSQL. Stop Streamlit with Ctrl+C. Docker is only needed for the separate database setup check at this milestone.
 
 ## Troubleshooting
 
-| Symptom | Action |
+| Problem | What to do |
 | --- | --- |
-| `python3.12` or `py -3.12` not found | Install Python 3.12, reopen the terminal, and check the version before creating `.venv`. |
-| Wrong Python version in verifier | Create the environment with Python 3.12; ask a PM before replacing an existing environment if unsure. |
-| `ModuleNotFoundError` or wrong package version | Activate `.venv`, check `python -c "import sys; print(sys.executable)"`, then repeat `python -m pip install -r requirements.txt`. |
-| Notebook imports fail but terminal works | Select the CourtIQ kernel; compare `sys.executable` in both places. Restart the kernel after installing packages. |
-| Fixture not found | Keep the notebook inside this checkout, including `notebooks/submissions/`; do not move it to Downloads. |
-| Chart does not appear | Run imports first; use `fig.show(renderer="notebook")`. Trust your own notebook via File → Trust Notebook if needed, then rerun the cell. |
-| Port 8501 in use | Stop the earlier server or run `python -m streamlit run app.py --server.port 8502` and use port 8502. |
-| Install times out or fails | Retry on a stable network. Save the error text and ask a PM; avoid randomly changing pins. |
-| Live NBA request times out | Use the supplied offline fixture; live API access is optional and not assessed. |
+| `docker` or `docker compose` not found | Finish Docker Desktop/Compose installation, reopen your terminal and repeat the version commands. |
+| Cannot connect to Docker daemon / only Client shown | Launch Docker Desktop and wait for the engine. On Linux Engine, check the documented service/permission setup with a PM. |
+| WSL 2 or virtualization error | Follow the Windows installer prerequisites; ask a PM if administrator or institution restrictions prevent setup. |
+| No configuration file found | Enter the member worktree root containing `compose.yaml`; check `pwd` or PowerShell `Get-Location`. |
+| `POSTGRES_PASSWORD` missing/empty | Open your local `.env` and set the password. Keep it private; do not edit `.env.example` to store it. |
+| Port 5432 already allocated | Set `POSTGRES_PORT=5433` in `.env`, then rerun `docker compose up -d`. The container query command stays the same. |
+| Service still starting or unhealthy | Wait briefly, rerun `docker compose ps`, then inspect `docker compose logs --tail=50 postgres`. Send relevant errors to the PM with secrets removed. |
+| Image download fails | Check network/disk space and retry; avoid changing the PostgreSQL major version to work around a transient download failure. |
+| Role/database does not exist after changing settings | Existing volumes retain their original initialization settings. Restore those settings or ask a PM; do not delete the volume. |
+| SQL prompt does not show a result | Include the semicolon in `SELECT 1;`; use `\q` to exit. |
+| PowerShell blocks venv activation | Use Command Prompt with `.venv\Scripts\activate.bat`, or ask a PM. |
+| Python imports fail | Activate `.venv`, check `python -c "import sys; print(sys.executable)"`, and reinstall the pinned requirements. |
 
-Do not commit `.venv/`, `.env` files, tokens, notebook checkpoint folders, downloaded NBA data or caches. See [DATA.md](../DATA.md) and [CONTRIBUTING.md](../CONTRIBUTING.md).
+If blocked, comment on the assignment Issue with your OS, command and relevant error. Keep passwords/tokens out of shared output.

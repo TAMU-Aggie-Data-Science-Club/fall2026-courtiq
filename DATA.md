@@ -11,21 +11,16 @@ This file explains **CourtIQ's** data sources — where they come from, how to g
 | NBA Stats API (unofficial)     | https://github.com/swar/nba_api      | `pip install nba_api`                          | MIT package; NBA data subject to NBA terms                  | None        | **Primary source.** Current player/team stats, game logs, advanced stats, rankings, play-by-play, and shot-chart data.                                                           |
 | Basketball-Reference           | https://www.basketball-reference.com | HTML scrape via `basketball_reference_scraper` | Educational use — respect site restrictions and rate limits | None        | **Secondary analytics source.** Advanced and historical metrics such as PER, TS%, USG%, Win Shares, BPM, VORP, and per-possession statistics.                                    |
 | `nbadb` / Kaggle NBA Database  | https://github.com/wyattowalsh/nbadb | Download database/Parquet/CSV or use Kaggle    | Per-dataset / repository terms                              | None        | **Historical data source.** Bulk historical NBA data for long-term trends, league comparisons, and potential ML training without repeatedly requesting old seasons from NBA.com. |
-| Synthetic onboarding fixture | [tests/fixtures/synthetic_player_stats.csv](tests/fixtures/synthetic_player_stats.csv) — authored for CourtIQ | Local `pandas.read_csv`; no network | TBD — no repository-wide redistribution license declared; internal teaching fixture | None — all identities and values invented | Tracked outside `data/` solely for reproducible onboarding; not actual NBA observations. |
+| Synthetic onboarding fixture | [weekly/week0/player_stats_backup.csv](weekly/week0/player_stats_backup.csv) — authored for CourtIQ | Local `pandas.read_csv`; no network | TBD — no repository-wide redistribution license declared; internal teaching fixture | None — all identities and values invented | Tracked outside `data/` solely for reproducible onboarding; not actual NBA observations. |
 | NBA API `stats.nba.com` direct | https://stats.nba.com                | HTTP via `nba_api`                             | Unofficial                                                  | None        | Same source `nba_api` wraps; use directly only if the wrapper is missing a required endpoint.                                                                                    |
 
-## Starter data and permission status
+## Onboarding data
 
-Onboarding uses only the explicitly synthetic fixture above. It is teaching material, not a new external NBA source, and must never be shown as real NBA data in the application. Fixture columns distinguish totals from already calculated per-game averages; see its [dictionary](tests/fixtures/README.md).
+The starter [weekly/week0/onboarding.py](weekly/week0/onboarding.py) defaults to the clearly fictional backup, tracked alongside the assignment outside `data/`. It supplies `GP` (games played), `PTS_TOTAL` (backup-only total points), and already averaged `PTS_PER_GAME`, `REB_PER_GAME`, `AST_PER_GAME`. Never divide averages by games played again.
 
-`nba_api` is the selected primary client, but the package's [MIT license](https://github.com/swar/nba_api/blob/master/LICENSE) does not grant permission to redistribute NBA data. Existing secondary/historical entries are retained as planning context; this starter adds no scrapers, downloads or retrieval pipeline. Their exact data-use/redistribution permissions remain **TBD pending PM review**, including NBA terms. “Educational use” in the register is not proof of a license. No repository-wide fixture redistribution license is declared either; PMs must decide it before external redistribution. No live data is fetched by this setup.
+The prepared `nba_api` option requests one season with `PerGame` units, names NBA.com as its source, and falls back to the backup on failure. Private classroom use follows [NBA terms](https://www.nba.com/termsofuse). Public product/database use still needs PM permission review. The client's MIT license does not license NBA data. Existing secondary-source permissions and the repository's redistribution license remain TBD; no secondary source is fetched by onboarding.
 
-Before implementing retrieval, a PM must confirm:
-
-- The exact source/dataset, current license/terms and permitted access method.
-- Whether caching, internal sharing and publication are permitted, with a recorded source/date.
-- Sensitivity/PII and any restrictions (public professional statistics still have source terms).
-- Conservative request limits and retention/freshness policy; stop if permission is unclear.
+Before production retrieval, a PM confirms source terms, allowed caching/publication, sensitivity and request limits. Keep real downloads and generated charts under ignored `data/`; do not redistribute raw datasets.
 
 ## How to think about using each source
 
@@ -54,4 +49,4 @@ Because `data/` isn't in git, the **pipeline that fetches and builds these folde
 
 Future cached API responses belong in `data/raw/`; cleaned tables in `data/interim/`; application-ready tables in `data/processed/`. Preserve source, retrieval time, season, endpoint parameters and units alongside local outputs. Do not repeat live requests on every UI interaction. The current application has no cache reader or API collector.
 
-PostgreSQL is the eventual shared structured store, not a setup prerequisite. Schema, connection handling and ingestion are future deliverable work. Database exports remain local under `data/`; credentials stay in ignored environment/secrets files. The deliberately fictional teaching fixture is the only supplied tabular example tracked outside `data/`; real downloaded or derived NBA datasets must never be committed anywhere in the repo.
+PostgreSQL is a required Week 0 setup prerequisite via [Compose](compose.yaml); members verify health and `SELECT 1;` only. Schema, application connection handling and ingestion are future deliverable work. Compose keeps database files in a Docker-managed named volume outside Git; stop/down preserve it unless volume removal is explicitly requested. Local `.env` credentials remain ignored, while the empty [.env.example](.env.example) documents settings. Database exports remain local under `data/`; credentials stay in ignored environment/secrets files. The fictional onboarding backup is the only supplied tabular example tracked outside `data/`; real downloaded or derived NBA datasets must never be committed anywhere in the repo.

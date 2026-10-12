@@ -6,7 +6,7 @@ CourtIQ helps casual NBA fans and people comparing player/team performance under
 
 ## Current implementation status
 
-Implemented in this starter: a runnable Streamlit navigation shell in [app.py](app.py), a shared Python environment, an offline synthetic teaching fixture and a guided notebook. The shell has **no data retrieval, calculations, charts or database**. Everything in the feature table below is planned. The onboarding chart is a student exercise using fictional data, not a product feature.
+Implemented in this starter: a runnable Streamlit navigation shell in [app.py](app.py), a shared local Python environment, PostgreSQL-only Docker Compose setup, a guided Python onboarding script with synthetic backup and a prepared optional NBA API request. The shell has **no data retrieval, calculations, charts or database connection**. The separate database service is initialized for environment verification only; no application schema or ingestion exists. Everything in the feature table below is planned. The onboarding chart is a student exercise, not an application feature. Backup results are explicitly fictional; API results identify NBA.com as their source.
 
 ## Navigation and requirements
 
@@ -31,7 +31,7 @@ NBA API (nba_api; source permissions checked before retrieval)
 Later: processed tables → PostgreSQL → analytics functions → UI
 ```
 
-Initially, local cached tables support development without adding a running database requirement. PostgreSQL remains the planned shared structured store for the semester; integration is tracked with milestones 2 and 7 and is not implemented in this setup. The offline synthetic fixture follows a separate teaching path straight to pandas; it never feeds product pages. API network requests must not run on every Streamlit rerender. Future collection should have bounded timeouts, conservative request rates, cache timestamps and visible failure handling, after source review in [DATA.md](DATA.md).
+Initially, local cached tables support development without adding a running database requirement. PostgreSQL runs locally in Docker Compose during Week 0 so every member can verify readiness and SQL. Its application schema, ingestion and app integration remain future milestones 2 and 7. The onboarding script loads its synthetic backup or makes one bounded NBA request for private classroom practice; this separate exercise never feeds product pages. API network requests must not run on every Streamlit rerender. Future collection should have bounded timeouts, conservative request rates, cache timestamps and visible failure handling, after source review in [DATA.md](DATA.md).
 
 ## Responsibility boundaries and suggested structure
 
@@ -39,11 +39,14 @@ Use plain Python functions and DataFrames first. Create future modules only as t
 
 ```text
 app.py                         # implemented navigation + placeholders
-requirements.txt               # implemented shared environment
+requirements.txt               # implemented local Python environment
+compose.yaml                   # implemented PostgreSQL service and named volume
+.env.example                   # shared empty-password settings; .env stays private
+docs/SETUP.md                  # local Python + Docker database setup instructions
 scripts/verify_environment.py  # implemented offline verification
-notebooks/00_onboarding.ipynb   # implemented guided experiment, TODOs unanswered
-tests/fixtures/                # implemented fictional teaching data
-docs/                          # implemented setup, assignment and issue draft
+weekly/week0/onboarding.py           # implemented guided script; student TODOs unanswered
+weekly/week0/player_stats_backup.csv # fictional teaching data
+weekly/                        # concise student assignment, index and reusable template
 
 # Planned as later issues, not present yet:
 courtiq/data.py                 # collection, source schema, cleaning, local I/O
@@ -54,13 +57,13 @@ scripts/fetch_data.py           # explicit collection entry point after source r
 data/raw/, interim/, processed/ # ignored local NBA responses and derived tables
 ```
 
-Collection owns endpoint parameters, IDs, units and freshness. Analytics receives tables, documents formulas/cohorts and does not fetch data or render UI. Charts receive analytics outputs and label axes/periods. UI owns navigation, user inputs, empty states and explanatory context; it does not duplicate formulas. Notebooks are exploratory; approved calculations move to ordinary functions for testing and reuse. Schema naming and database design are later review decisions, not silently fixed by this suggested structure.
+Collection owns endpoint parameters, IDs, units and freshness. Analytics receives tables, documents formulas/cohorts and does not fetch data or render UI. Charts receive analytics outputs and label axes/periods. UI owns navigation, user inputs, empty states and explanatory context; it does not duplicate formulas. Approved calculations from onboarding move to ordinary functions for testing and reuse. Schema naming and database design are later review decisions, not silently fixed by this suggested structure.
 
 ## Feature dependencies and roadmap
 
 | Milestone | Contribution to application | Gate before moving forward |
 | --- | --- | --- |
-| 0 — Before first meeting (PM sets date) | Each member installs tools, explores synthetic data and proposes one idea | Executed individual notebook, verification evidence and proposal reviewed |
+| 0 — Before first meeting (PM sets date) | Each member sets up local Python, verifies Docker/PostgreSQL and completes a small API/backup-data exercise | Individual script, Python verifier, database health/SELECT 1 and chart evidence reviewed |
 | 1 — Sept 26–Oct 4 | Scope, shell, architecture and working agreements | PM reviews this starter; planning dates retained rather than assumed completed |
 | 2 — Oct 5–Oct 16 | Common player/team/game tables, cache policy and planned storage | Verify source permission, units, IDs and data quality before retrieval |
 | 3 & 4 — Oct 17–Nov 6 | Players and Teams profile slices plus later core profile requirements | Depend on milestone 2; share validated definitions |
@@ -68,4 +71,4 @@ Collection owns endpoint parameters, IDs, units and freshness. Analytics receive
 | 7 — Nov 21–Nov 29 | Connect all sections, storage and error states | Integrated workflow and reproducible refresh |
 | 8 — Nov 30–Dec 6 | Quality checks, usability, release and demo | Test calculations, freshness, missing data and communication |
 
-These are the existing planning dates, not claims that earlier work is finished. The current date may be past a target; PMs update actual scheduling through issues rather than this starter arbitrarily shifting deadlines. No ML packages, authentication, Docker or database implementation are part of this change.
+These are the existing planning dates, not claims that earlier work is finished. The current date may be past a target; PMs update actual scheduling through issues rather than this starter arbitrarily shifting deadlines. Docker runs only PostgreSQL. Python, any locally used Jupyter and Streamlit stay in venv; application schema/ingestion, ML and authentication remain deferred.

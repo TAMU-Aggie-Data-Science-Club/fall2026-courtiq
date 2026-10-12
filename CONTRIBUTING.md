@@ -1,29 +1,115 @@
 # Contributing Guide
 
-This is the playbook for running an **IDE Data Science Club** project on GitHub. It is **not** a general Git tutorial — it assumes you can already commit and push. What it explains is *how we work together in this repo*: who does what, how work flows from an idea to `main`, and which Git commands you reach for at each step.
+This guide explains how the Aggie Data Science Club team uses GitHub, including the first steps for people who have never used Issues, commits or pull requests.
 
-Read your role's section first. Everyone should read [The Flow](#the-flow-issue--main) and [Staying in Sync](#staying-in-sync) — they apply to all of us.
+**New to GitHub?** Start with [the terms and walkthrough below](#new-to-github). PMs should read [creating an Issue](#create-an-issue-pms); members should read [using an Issue](#use-an-issue-members) and [opening a PR](#open-a-pull-request-members). Then read your role's section, [The Flow](#the-flow-issue--main) and [Staying in Sync](#staying-in-sync).
 
 > **Two roles, one repo.** **Project Managers (PMs)** are *managers*: they turn goals into issues, review pull requests, and are the only people who approve merges to `main`. **Members** are *developers*: they take an issue, build it on a branch, open a pull request, respond to review, and merge their work up the tree. If you are an AI agent working in this repo, also read [`AGENTS.md`](AGENTS.md) — it is the strict machine-facing version of this same workflow.
 
 > **Companion files.** This guide links to other template files — [`AGENTS.md`](AGENTS.md), [`README.md`](README.md), [`DELIVERABLES.md`](DELIVERABLES.md), [`DATA.md`](DATA.md), and the [`data/`](data/) folder. They are part of the template and are populated as the repo is set up (each lands through its own issue and PR, exactly as described below). If a link 404s, that file simply hasn't been merged to `main` yet — it will be before the template is complete.
 
-**First assignment:** use [Deliverable 0](weekly/week-00-onboarding.md) and the [setup guide](docs/SETUP.md). Its member-specific notebook/proposal paths avoid collisions; its PRs still target the shared issue integration branch. PMs can review the [draft issue](docs/ONBOARDING_ISSUE.md) before publishing.
+**First assignment:** follow [Week 00](weekly/week0/week-00-onboarding.md). Each member submits their own Python script through a feature PR into the shared issue integration branch.
 
 ---
 
 ## Table of Contents
 
-1. [The mental model](#the-mental-model)
-2. [The flow: issue → `main`](#the-flow-issue--main)
-3. [Staying in sync](#staying-in-sync)
-4. [For Members (developers)](#for-members-developers)
-5. [For Project Managers (managers)](#for-project-managers-managers)
-6. [Branch naming](#branch-naming)
-7. [Worktrees: one issue, one tree](#worktrees-one-issue-one-tree)
-8. [Git commands in context](#git-commands-in-context)
-9. [Code-review agents (strongly recommended)](#code-review-agents-strongly-recommended)
-10. [Golden rules](#golden-rules)
+1. [New to GitHub](#new-to-github)
+2. [The mental model](#the-mental-model)
+3. [The flow: issue → `main`](#the-flow-issue--main)
+4. [Staying in sync](#staying-in-sync)
+5. [For Members (developers)](#for-members-developers)
+6. [For Project Managers (managers)](#for-project-managers-managers)
+7. [Branch naming](#branch-naming)
+8. [Worktrees: one issue, one tree](#worktrees-one-issue-one-tree)
+9. [Git commands in context](#git-commands-in-context)
+10. [Code-review agents (strongly recommended)](#code-review-agents-strongly-recommended)
+11. [Golden rules](#golden-rules)
+
+---
+
+## New to GitHub
+
+Use the website for Issues and PRs, and a terminal (PowerShell on Windows, Terminal on macOS/Linux) for Git commands. An editor is only needed to change your Python file; no particular editor or GitHub CLI installation is required.
+
+| Term | Meaning in this project |
+| --- | --- |
+| Repository / repo | The project's files and their saved change history |
+| Git / GitHub | Git manages changes on your computer; GitHub hosts the shared repository online |
+| Issue | A task card: instructions link, deadline, owners, questions and completion checklist |
+| Clone | Download a local working copy and its Git history |
+| Branch | A named line of work; your feature branch keeps your work separate until reviewed |
+| Integration branch | The shared branch collecting approved work for one Issue |
+| Worktree | Another local folder for a branch, backed by the same clone |
+| Stage / commit | Choose the files for your next saved change, then save that change locally |
+| Push / fetch | Upload committed changes to GitHub / download knowledge of remote branches and commits |
+| Pull request / PR | A request for teammates to review and merge your branch's changes |
+| Base / compare | A PR's destination branch / the branch containing your changes |
+| Merge | Bring reviewed changes into the destination branch |
+
+An assignment file explains the work, an Issue tracks it, and a PR contains the finished code. **Week 0 has one shared Issue and nine individual PRs.** Later tasks may have their own Issues; PMs choose that breakdown. The number `42` in examples below is a placeholder: use the number shown on your real Issue.
+
+### Create an Issue (PMs)
+
+1. Sign into GitHub and open [the CourtIQ repository](https://github.com/TAMU-Aggie-Data-Science-Club/fall2026-courtiq).
+2. Select the **Issues** tab, then **New issue**. If a template chooser appears, select the appropriate template or the blank-Issue option.
+3. Enter a title, such as `Deliverable 0 — Python, PostgreSQL setup and NBA data practice`, and a description. For Week 0, copy the sample below and fill in the deadline; add the real instructions URL when the starter is published.
+4. Use **Assignees** to identify the responsible member(s), if available. For the shared onboarding Issue, keep the nine-member checklist and let members comment to claim their individual submission. Labels and a Project board are optional for starting this assignment.
+5. Submit the Issue. GitHub supplies its number, shown beside/below the title and at the end of its URL (`.../issues/42`, for example). Copy that actual number and the Issue URL.
+6. Have the PM/Co-PM prepare the matching integration branch and publish the reviewed starter as described in [the PM section](#for-project-managers-managers). An Issue stores the task description; it does not upload your local code.
+7. On the repository's **Code** tab, select the published integration branch in the branch selector, open `weekly/week0/week-00-onboarding.md`, and copy its URL into the Issue description. Announce the Issue URL, deadline and integration branch name. Members start after that branch contains the starter files.
+
+Sample **description to paste into GitHub**, not a new file to add to the repository:
+
+```markdown
+Every member verifies local Python and Docker/PostgreSQL, then completes their own Python onboarding script.
+Due: REPLACE WITH ACTUAL DATE/TIME (America/Chicago)
+Instructions: weekly/week0/week-00-onboarding.md
+REPLACE THE PATH ABOVE WITH ITS PUBLISHED INTEGRATION-BRANCH URL WHEN READY.
+
+Each member must:
+- Pass Python environment verification, show healthy PostgreSQL and a successful SELECT 1 query, and complete every script TODO.
+- Submit weekly/week0/<github-handle>_onboarding.py.
+- Attach Python, Docker health/SQL and chart evidence; state API or synthetic backup as the source.
+- Keep .env credentials and database files out of the submission; schema/ingestion is not required.
+- Open a PR into this Issue's integration branch and request review.
+
+Completion tracker (PM checks after review):
+- [ ] Aiden Jackson — PR link:
+- [ ] Ignacio Wijatno — PR link:
+- [ ] Andrew Mok — PR link:
+- [ ] June Hwang — PR link:
+- [ ] Jack Dunlap — PR link:
+- [ ] Jason Q. Koffi — PR link:
+- [ ] Michael Du — PR link:
+- [ ] Casey Hawkings — PR link:
+- [ ] Sri Abhinav Thatavarthi — PR link:
+```
+
+To change the deadline/instructions or check completion, edit the Issue description (its **⋯** menu → **Edit**) and save the update. Use comments for questions, blockers and links to submitted PRs. Keep the shared Issue open until all required work is complete and the PM's final integration review is done. [GitHub's Issue creation reference](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/creating-an-issue).
+
+### Use an Issue (members)
+
+1. Open the Issue URL sent by the PM. Alternatively, open the repo's **Issues** tab and search for the assignment title.
+2. Read its description, linked assignment and comments. Write down the actual Issue number, deadline and integration branch. Do not use example `42` unless that is really its number.
+3. For Week 0, enter `I am <name> (@<handle>), Team <A/B/C>. I will complete my individual submission.` in the comment box and select **Comment**. This claims your slice, not the whole shared assignment. For a one-person Issue, follow the PM's assignment/Assignees instructions instead.
+4. Follow Week 0's clone/worktree commands, then set up the environment and complete your personal script. Work inside the new worktree folder, not the original clone's `main` checkout.
+5. If blocked, comment on the Issue with the command you ran, error text and OS. Redact tokens/passwords. Ask before replacing the agreed workflow or changing project scope.
+6. When your PR is open, add its link in an Issue comment. The PM updates the completion tracker after review; clicking **Close issue** is not how you submit your assignment.
+
+### Open a pull request (members)
+
+First save your files, run the assignment checks, stage only your own source files, commit them and push your feature branch. [Week 0](weekly/week0/week-00-onboarding.md#4-submit-your-script) provides the exact commands and explains them.
+
+1. In the GitHub repo, select **Pull requests** → **New pull request**.
+2. Set **base** to your Issue's `issue-<n>/integration` branch. Set **compare** to your `issue-<n>/<slice>` feature branch. This means “send my feature changes to the shared assignment branch.”
+3. Inspect the changed files. Week 0 should show only your `weekly/week0/<handle>_onboarding.py`, not the common starter, backup, environments or generated chart. If you see unrelated work, stop and ask the PM before creating the PR.
+4. Select **Create pull request**, give it a clear title, and describe what you changed and how you ran/checked it. For Week 0, include `Related to #<n>`, source choice, Python verifier and Docker health/SQL results. Attach the required screenshots using the description's image/file attachment control.
+5. Submit the PR. In its **Reviewers** area, select a teammate or PM/Co-PM. If you cannot choose a reviewer, mention the PR link in the shared Issue and ask a PM to arrange review.
+6. Read comments on the PR's **Conversation** and **Files changed** tabs. Edit the same local files on the same feature branch, rerun relevant checks, then commit and push the fixes. The existing PR updates automatically; there is no need to open another PR for that feedback.
+7. Reply to review comments, explain your change and request another review. Wait for human approval and any configured automated checks. Merge up only under the project's rules; PMs handle the final integration-to-`main` PR.
+
+Use `Related to #<n>` on individual submissions for a shared Issue; a closing keyword on one member's PR would misrepresent the remaining work. [GitHub's PR creation reference](https://docs.github.com/en/pull-requests/how-tos/create-pull-requests/creating-a-pull-request).
 
 ---
 
@@ -48,7 +134,7 @@ Work flows **up the tree**: feature → integration → `main`. Reviews happen a
 
 ## The flow: issue → `main`
 
-This is the loop the whole project runs on. Every deliverable in this repo — including this file — went through it.
+This is the workflow for publishing project changes. The shared onboarding assignment follows it once the PM has prepared its Issue and starter branch.
 
 1. **Open an Issue.** Describe the problem, the goal, and a checklist of acceptance criteria. No issue, no work.
 2. **Cut the tree.** From the latest `main`, create the issue's integration branch, then a feature branch (in its own worktree) for the slice you're building.
@@ -86,28 +172,28 @@ git status                    # are you ahead/behind? clean/dirty?
 
 You own the *building*. Your job is to turn one issue's slice into a clean, reviewed PR.
 
-**1. Pick up an issue.** Assign it to yourself on GitHub so no two people duplicate work. Read the acceptance criteria — that's your definition of done.
+**1. Pick up an issue.** Read [Use an Issue](#use-an-issue-members), claim your slice and read its acceptance criteria. For Week 0, every member submits individually to one shared Issue.
 
-**2. Sync, then branch off `main`.**
+**2. Fetch the PM-prepared integration branch.** From your clone:
 ```sh
-git switch main && git pull origin main
-git switch -c issue-42/integration        # create the issue's trunk (if it doesn't exist yet)
-git push -u origin issue-42/integration
+git fetch origin
 ```
+The PM/Co-PM creates the integration branch once. If `origin/issue-42/integration` does not exist, ask the PM; members do not create nine separate integration branches.
 
-**3. Create a worktree for your slice** (see [Worktrees](#worktrees-one-issue-one-tree)):
+**3. Create a worktree for your slice:**
 ```sh
-git worktree add -b issue-42/loader ../PM_REPO_TEMPLATE.worktrees/loader issue-42/integration
+git worktree add -b issue-42/loader ../courtiq-loader origin/issue-42/integration
+cd ../courtiq-loader
 ```
+Replace `42` with the actual Issue number and `loader` with your assigned slice. [Week 0](weekly/week0/week-00-onboarding.md) uses `onboarding-<github-handle>` so each member has a unique branch and folder.
 
 **4. Build in small commits.** Each commit should be one coherent step, with a message that says *why*, not just *what*.
 
 **5. Push and open a PR into the integration branch:**
 ```sh
 git push -u origin issue-42/loader
-gh pr create --base issue-42/integration --fill
 ```
-Write a description a reviewer can act on: what changed, what you deliberately left out, and how you verified it.
+Then use the [GitHub PR walkthrough](#open-a-pull-request-members). Write a description explaining what changed and how you verified it. GitHub CLI is an optional alternative, not required.
 
 **6. Respond to review.** Read the whole review before touching anything. Fix what's clearly right yourself; only ask the PM when there's a real judgment call (naming, scope, product behavior). Push follow-up commits and re-request review.
 
@@ -122,6 +208,18 @@ Write a description a reviewer can act on: what changed, what you deliberately l
 You own the *coordination and the gate to `main`*. You mostly work in GitHub's UI, not the terminal.
 
 **1. Turn goals into Issues.** Break the project (see [`DELIVERABLES.md`](DELIVERABLES.md)) into issues small enough for one person to finish in a few days. Give each a clear title, acceptance-criteria checklist, and labels. Assign or let members self-assign.
+
+**Prepare the Issue's integration branch once.** Use a clean clone and check `git status --short` first. If it lists existing work, preserve/review that work on its feature branch or ask the Co-PM for help before switching branches. These commands are for a human PM/Co-PM preparing the branch, not an instruction for an agent to publish it:
+
+```sh
+git fetch origin
+git switch main
+git pull --ff-only origin main
+git switch -c issue-42/integration
+git push -u origin issue-42/integration
+```
+
+Replace `42` with the newly created Issue number. If the integration branch already exists remotely, reuse it instead of creating another one. Put starter changes on a feature branch/worktree and get its PR into integration reviewed before members begin. For the existing locally prepared onboarding files, coordinate with the Co-PM to preserve and publish that reviewed preparation through this feature → integration process; creating the Issue alone does not make those files available. Share the integration branch name once the starter is present.
 
 **2. Maintain the board.** Keep issues triaged and prioritized so members always know what to pick up next. Link related issues; close duplicates.
 

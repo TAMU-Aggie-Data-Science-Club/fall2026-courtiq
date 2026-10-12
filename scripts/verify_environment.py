@@ -32,7 +32,7 @@ def main():
         import pandas as pd
         import plotly.express as px
 
-        fixture = root / "tests/fixtures/synthetic_player_stats.csv"
+        fixture = root / "weekly/week0/player_stats_backup.csv"
         frame = pd.read_csv(fixture)
         # A smoke check only; the member's filtering/ranking exercise stays unanswered.
         fig = px.bar(frame.head(2), x="PLAYER_NAME", y="PTS_PER_GAME")
