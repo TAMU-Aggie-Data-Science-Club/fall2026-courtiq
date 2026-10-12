@@ -8,6 +8,8 @@ Read your role's section first. Everyone should read [The Flow](#the-flow-issue-
 
 > **Companion files.** This guide links to other template files — [`AGENTS.md`](AGENTS.md), [`README.md`](README.md), [`DELIVERABLES.md`](DELIVERABLES.md), [`DATA.md`](DATA.md), and the [`data/`](data/) folder. They are part of the template and are populated as the repo is set up (each lands through its own issue and PR, exactly as described below). If a link 404s, that file simply hasn't been merged to `main` yet — it will be before the template is complete.
 
+**First assignment:** use [Deliverable 0](weekly/week-00-onboarding.md) and the [setup guide](docs/SETUP.md). Its member-specific notebook/proposal paths avoid collisions; its PRs still target the shared issue integration branch. PMs can review the [draft issue](docs/ONBOARDING_ISSUE.md) before publishing.
+
 ---
 
 ## Table of Contents

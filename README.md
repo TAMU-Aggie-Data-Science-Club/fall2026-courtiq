@@ -1,10 +1,10 @@
-# PlayPulse — Beginner
+# CourtIQ
 
 *ADSC Catalyst Project · Fall 2026*
 
 ## Overview
 
-PlayPulse is an interactive NBA analytics platform that organizes current and historical player, team, and game data into clear profiles and visualizations. The goal is to make NBA statistics easier to understand for casual fans and fantasy basketball players without requiring them to search across multiple websites or interpret large statistical tables.
+CourtIQ is an interactive NBA analytics platform that organizes current and historical player, team, and game data into clear profiles and visualizations. The goal is to make NBA statistics easier to understand for casual fans and fantasy basketball players without requiring them to search across multiple websites or interpret large statistical tables.
 
 The final product will be a Streamlit application where users can explore player and team performance, compare players or teams, analyze recent trends, and understand how performance compares to league benchmarks.
 
@@ -23,17 +23,44 @@ Build an NBA analytics platform that allows users to:
 
 If the core application is completed ahead of schedule, the project may also explore player similarity and machine-learning models for player performance or game outcome forecasting.
 
-## Suggested tech stack
+## Application sections and current status
 
-* **Data processing:** Python, Pandas, NumPy
-* **Database:** PostgreSQL
-* **Visualization:** Plotly, Matplotlib, Seaborn
-* **Dashboard:** Streamlit
-* **Data exploration:** Jupyter Notebook
-* **Data sources:** `nba_api` (NBA.com Stats), Basketball-Reference, and `nbadb` for historical data
-* **Stretch modeling / ML:** Scikit-learn, XGBoost
+| Section | Planned purpose |
+| --- | --- |
+| Players | Search/select players; season and recent performance, percentiles, strengths/weaknesses and shot charts |
+| Teams | Search/select teams; records, rankings, offensive/defensive efficiency and recent form |
+| Compare | Two players or two teams; normalized metrics and interactive charts with fair comparison context |
+| Trends | Rolling averages and recent-versus-season views that explain changes without overstating noise |
 
-See [`DATA.md`](DATA.md) for the selected data sources and how they will be used.
+**Implemented now:** four-section Streamlit navigation with explicitly labeled placeholders, shared environment and offline onboarding materials. **Planned:** all real NBA retrieval, statistics, product charts and PostgreSQL storage. The synthetic notebook exercise is teaching material only.
+
+## Selected tech stack
+
+* **Environment:** Python 3.12 with one local `venv`.
+* **Processing:** pandas and NumPy; **primary source:** `nba_api`.
+* **Application and charts:** Streamlit and Plotly.
+* **Experimentation/onboarding:** Jupyter Notebook.
+* **Eventual structured storage:** PostgreSQL (not required for this starter).
+* **Approved stretch work only:** scikit-learn and XGBoost (not installed).
+
+Data flows from NBA API → Python/pandas → local cached data (eventually PostgreSQL) → analytics functions → Streamlit/Plotly. See [ARCHITECTURE.md](ARCHITECTURE.md) for boundaries, feature dependencies and the roadmap, and [DATA.md](DATA.md) for source restrictions. Existing secondary sources remain documented there; onboarding does not fetch them.
+
+## Quick start
+
+Install Python 3.12 and Git. From a cloned checkout on macOS/Linux:
+
+```sh
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python scripts/verify_environment.py
+python -m pip check
+python -m streamlit run app.py
+```
+
+Open `http://localhost:8501` and use the sidebar. On Windows use `py -3.12 -m venv .venv` and `.\.venv\Scripts\Activate.ps1`, then the same `python` commands. See [full setup](docs/SETUP.md) for cloning, activation troubleshooting and the Jupyter kernel.
+
+Browse the [weekly assignments](weekly/README.md), starting with [Deliverable 0](weekly/week-00-onboarding.md) before the first meeting: 1–2 hours per member, with an individual notebook and proposal. The [starter notebook](notebooks/00_onboarding.ipynb) uses a fictional fixture and keeps the student TODOs unanswered.
 
 ## What team members will gain
 
@@ -50,7 +77,7 @@ See [`DATA.md`](DATA.md) for the selected data sources and how they will be used
 
 The core project focuses on **player and team analytics rather than prediction**.
 
-Build:
+Planned semester requirements (not implemented by this starter):
 
 1. A reproducible pipeline for collecting and cleaning NBA player, team, and game data.
 2. A shared PostgreSQL database containing the processed data needed by the application.
@@ -71,6 +98,13 @@ See [`DELIVERABLES.md`](DELIVERABLES.md) for the deliverable breakdown and timel
 
 | File / folder                        | Purpose                                                                                                                                         |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Setup](docs/SETUP.md) | Python environment, verification, Jupyter and Streamlit commands for all platforms. |
+| [Weekly assignments](weekly/README.md) | Assignment index and reusable template; GitHub Issues control owners, status and changes. |
+| [Week 00 / Deliverable 0](weekly/week-00-onboarding.md) | Complete individual pre-meeting assignment, setup and submission instructions. |
+| [Architecture](ARCHITECTURE.md) | Product plan, module boundaries, MVP/later requirements and status. |
+| [Draft onboarding issue](docs/ONBOARDING_ISSUE.md) | Proposed shared issue and nine-member acceptance tracker; not published. |
+| [Starter notebook](notebooks/00_onboarding.ipynb) | Guided synthetic-data exercise with student TODOs. |
+| [Verification script](scripts/verify_environment.py) | Offline environment and fixture smoke check. |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | **Start here.** How the team runs the project on GitHub — PM vs. member roles, the issue → PR → `main` flow, branching, worktrees, and reviews. |
 | [`DELIVERABLES.md`](DELIVERABLES.md) | Current project milestones and rough timeline. A living plan, not a contract.                                                                   |
 | [`DATA.md`](DATA.md)                 | Selected data sources, how to access them, and guidelines for using them.                                                                       |
