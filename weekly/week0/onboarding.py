@@ -75,10 +75,6 @@ def main():
     fig.write_html(output, include_plotlyjs=True)
     print(f"Open this file in a browser: {output}")
 
-    # TODO 5: Add two comments interpreting your result and noting one limitation.
-    # Your interpretation:
-    # Your limitation:
-
 
 if __name__ == "__main__":
     main()

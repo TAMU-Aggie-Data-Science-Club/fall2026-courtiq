@@ -6,6 +6,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-courtiq}
       POSTGRES_DB: ${POSTGRES_DB:-courtiq}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your local .env file}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    command: ["postgres", "-c", "password_encryption=scram-sha-256"]
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:

@@ -32,7 +32,7 @@ If the core application is completed ahead of schedule, the project may also exp
 | Compare | Two players or two teams; normalized metrics and interactive charts with fair comparison context |
 | Trends | Rolling averages and recent-versus-season views that explain changes without overstating noise |
 
-**Implemented now:** four-section Streamlit navigation with explicitly labeled placeholders, shared environment, PostgreSQL Compose setup and onboarding materials. **Planned:** application data collection, analytics, product charts and PostgreSQL storage. The onboarding script has a separate optional API request for classroom practice. The synthetic backup is teaching material only.
+**Implemented now:** four-section Streamlit navigation with explicitly labeled placeholders, shared environment, local PostgreSQL with a reproducible fictional starter table, private admin/read-only credentials, checked backups/recovery and onboarding materials. **Planned:** application data collection, analytics, product charts and production NBA schemas/storage. The onboarding script has a separate optional API request for classroom practice. The synthetic backup is teaching material only.
 
 ## Selected tech stack
 
@@ -40,7 +40,7 @@ If the core application is completed ahead of schedule, the project may also exp
 * **Processing:** pandas and NumPy; **primary source:** `nba_api`.
 * **Application and charts:** Streamlit and Plotly.
 * **Onboarding:** a regular Python script; use any text editor.
-* **Database:** PostgreSQL in Docker Compose; Week 0 verifies the server, with schema and ingestion deferred.
+* **Database:** local PostgreSQL in Docker Compose; supplied setup loads fictional starter data and configures backups. Production NBA schemas/ingestion remain planned.
 * **Approved stretch work only:** scikit-learn and XGBoost (not installed).
 
 Data flows from NBA API → Python/pandas → local cached data (eventually PostgreSQL) → analytics functions → Streamlit/Plotly. See [ARCHITECTURE.md](ARCHITECTURE.md) for boundaries, feature dependencies and the roadmap, and [DATA.md](DATA.md) for source restrictions. Existing secondary sources remain documented there; onboarding does not fetch them.
@@ -59,6 +59,8 @@ python -m streamlit run app.py
 ```
 
 Open `http://localhost:8501` and use the sidebar. On Windows use `py -3.12 -m venv .venv` and `.\.venv\Scripts\Activate.ps1`, then the same `python` commands. See [Week 00](weekly/week0/week-00-onboarding.md) for cloning, the required database check and the first coding exercise.
+
+After installing Docker and activating `.venv`, `python scripts/database.py setup` prepares the local database, generates private passwords, loads the same fictional data for everyone and installs daily backup checks. Use `python scripts/database.py status` to verify it, and `python scripts/database.py backup` for an immediate archive. [Setup and recovery](docs/SETUP.md#7-backups-and-recovery) explain restoration into a separate database and the limits of local backups. Each member's database is independent; future hosting provides shared data for the deployed application.
 
 Browse the [weekly assignments](weekly/README.md), starting with [Deliverable 0](weekly/week0/week-00-onboarding.md) before the first meeting. Copy [weekly/week0/onboarding.py](weekly/week0/onboarding.py), run it with Python, and complete its TODOs using the prepared API request or synthetic backup.
 
@@ -100,8 +102,9 @@ See [`DELIVERABLES.md`](DELIVERABLES.md) for the deliverable breakdown and timel
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | [Development setup](docs/SETUP.md) | Local Python plus Docker/PostgreSQL installation, health/SQL verification, shutdown and troubleshooting. |
 | [PostgreSQL Compose](compose.yaml) | One local database service with persistent storage; configure your private `.env` from [.env.example](.env.example). |
+| [Database tools](scripts/database.py) | Provided setup/fixture loader, read-only application access, checked backups, scheduling and recovery; [starter schema](scripts/database.sql). |
 | [Deliverable structure](weekly/deliverables_strucutre.md) | How assignments are created, proposed team responsibilities, Co-PM checks and submission. |
-| [Weekly assignments](weekly/README.md) | Assignment index and reusable template; GitHub Issues control owners, status and changes. |
+| [Weekly assignments](weekly/README.md) | Assignment index and reusable template; Week 0 uses Discord/PRs, future work uses GitHub Issues. |
 | [Week 00 / Deliverable 0](weekly/week0/week-00-onboarding.md) | Complete individual pre-meeting assignment, setup and submission instructions. |
 | [Architecture](ARCHITECTURE.md) | Product plan, module boundaries, MVP/later requirements and status. |
 | [Onboarding script](weekly/week0/onboarding.py) | Start here for basic coding with prepared NBA API loading or synthetic backup. |
@@ -123,4 +126,4 @@ This README, [`DELIVERABLES.md`](DELIVERABLES.md), and [`DATA.md`](DATA.md) desc
 
 ## Notes for members
 
-New to GitHub? Start with [the beginner terms and walkthrough](CONTRIBUTING.md#new-to-github). Open the assignment Issue sent by the PM and follow [Week 0](weekly/week0/week-00-onboarding.md).
+New to GitHub? Start with [the beginner terms and walkthrough](CONTRIBUTING.md#new-to-github). Follow the PM's Discord announcement and [Week 0](weekly/week0/week-00-onboarding.md); submit your individual PR into `deliverable0`. Week 0 does not require an Issue.

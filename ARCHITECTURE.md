@@ -6,7 +6,7 @@ CourtIQ helps casual NBA fans and people comparing player/team performance under
 
 ## Current implementation status
 
-Implemented in this starter: a runnable Streamlit navigation shell in [app.py](app.py), a shared local Python environment, PostgreSQL-only Docker Compose setup, a guided Python onboarding script with synthetic backup and a prepared optional NBA API request. The shell has **no data retrieval, calculations, charts or database connection**. The separate database service is initialized for environment verification only; no application schema or ingestion exists. Everything in the feature table below is planned. The onboarding chart is a student exercise, not an application feature. Backup results are explicitly fictional; API results identify NBA.com as their source.
+Implemented in this starter: a runnable Streamlit navigation shell in [app.py](app.py), a shared local Python environment, PostgreSQL-only Docker Compose setup, a guided Python onboarding script with synthetic backup and a prepared optional NBA API request. The shell has **no data retrieval, calculations, charts or database connection**. The separate database now has a reproducible fictional starter table, strong private credentials, read-only application access, checked local backups and recovery tools. Production NBA schemas/ingestion remain planned, as does everything in the feature table below. The onboarding chart is a student exercise, not an application feature. Backup results are explicitly fictional; API results identify NBA.com as their source.
 
 ## Navigation and requirements
 
@@ -31,7 +31,7 @@ NBA API (nba_api; source permissions checked before retrieval)
 Later: processed tables → PostgreSQL → analytics functions → UI
 ```
 
-Initially, local cached tables support development without adding a running database requirement. PostgreSQL runs locally in Docker Compose during Week 0 so every member can verify readiness and SQL. Its application schema, ingestion and app integration remain future milestones 2 and 7. The onboarding script loads its synthetic backup or makes one bounded NBA request for private classroom practice; this separate exercise never feeds product pages. API network requests must not run on every Streamlit rerender. Future collection should have bounded timeouts, conservative request rates, cache timestamps and visible failure handling, after source review in [DATA.md](DATA.md).
+Local cached tables support development; PostgreSQL runs locally in Docker Compose during Week 0. [scripts/database.py](scripts/database.py) prepares the same versioned fictional table for each member and provides admin loading, read-only application access, backups and recovery. Local databases do not synchronize. Production NBA schemas, source-approved ingestion and app integration remain future milestones 2 and 7; the final deployed app can use hosted PostgreSQL after that work is reviewed. The onboarding script loads its synthetic backup or makes one bounded NBA request for private classroom practice; this separate exercise never feeds product pages. API network requests must not run on every Streamlit rerender. Future collection should have bounded timeouts, conservative request rates, cache timestamps and visible failure handling, after source review in [DATA.md](DATA.md).
 
 ## Responsibility boundaries and suggested structure
 
@@ -43,6 +43,8 @@ requirements.txt               # implemented local Python environment
 compose.yaml                   # implemented PostgreSQL service and named volume
 .env.example                   # shared empty-password settings; .env stays private
 docs/SETUP.md                  # local Python + Docker database setup instructions
+scripts/database.py            # provided fictional loader, credentials, backup/schedule/recovery
+scripts/database.sql           # fictional starter table; production schemas remain planned
 scripts/verify_environment.py  # implemented offline verification
 weekly/week0/onboarding.py           # implemented guided script; student TODOs unanswered
 weekly/week0/player_stats_backup.csv # fictional teaching data
@@ -63,7 +65,7 @@ Collection owns endpoint parameters, IDs, units and freshness. Analytics receive
 
 | Milestone | Contribution to application | Gate before moving forward |
 | --- | --- | --- |
-| 0 — Before first meeting (PM sets date) | Each member sets up local Python, verifies Docker/PostgreSQL and completes a small API/backup-data exercise | Individual script, Python verifier, database health/SELECT 1 and chart evidence reviewed |
+| 0 — Before first meeting (PM sets date) | Each member sets up local Python, verifies Docker/PostgreSQL and completes a small API/backup-data exercise | Individual script reviewed; Python, database health/SELECT 1 and chart checks summarized in the PR |
 | 1 — Sept 26–Oct 4 | Scope, shell, architecture and working agreements | PM reviews this starter; planning dates retained rather than assumed completed |
 | 2 — Oct 5–Oct 16 | Common player/team/game tables, cache policy and planned storage | Verify source permission, units, IDs and data quality before retrieval |
 | 3 & 4 — Oct 17–Nov 6 | Players and Teams profile slices plus later core profile requirements | Depend on milestone 2; share validated definitions |
@@ -71,4 +73,4 @@ Collection owns endpoint parameters, IDs, units and freshness. Analytics receive
 | 7 — Nov 21–Nov 29 | Connect all sections, storage and error states | Integrated workflow and reproducible refresh |
 | 8 — Nov 30–Dec 6 | Quality checks, usability, release and demo | Test calculations, freshness, missing data and communication |
 
-These are the existing planning dates, not claims that earlier work is finished. The current date may be past a target; PMs update actual scheduling through issues rather than this starter arbitrarily shifting deadlines. Docker runs only PostgreSQL. Python, any locally used Jupyter and Streamlit stay in venv; application schema/ingestion, ML and authentication remain deferred.
+These are planning dates, not claims that earlier work is finished. PMs update actual scheduling rather than this starter arbitrarily shifting deadlines. Docker runs only PostgreSQL. Python, any locally used Jupyter and Streamlit stay in venv; production NBA schemas/ingestion, ML and application-user authentication remain deferred. Local database credentials and read-only permissions are implemented. Backups stay outside the database volume but on the same computer; [recovery instructions](docs/SETUP.md#7-backups-and-recovery) document that limitation.

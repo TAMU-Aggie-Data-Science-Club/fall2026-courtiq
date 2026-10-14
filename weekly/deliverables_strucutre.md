@@ -1,10 +1,12 @@
 # CourtIQ deliverable structure
 
-This is the shared guide for creating assignments, dividing responsibilities and reviewing submissions. [DELIVERABLES.md](../DELIVERABLES.md) remains the semester roadmap; [ARCHITECTURE.md](../ARCHITECTURE.md) defines product requirements. **GitHub Issues are authoritative for actual owners, deadlines, status and approved changes.** This document describes the process and proposed specialties, not a separate task tracker.
+This is the shared guide for creating assignments, dividing responsibilities and reviewing submissions. [DELIVERABLES.md](../DELIVERABLES.md) remains the semester roadmap; [ARCHITECTURE.md](../ARCHITECTURE.md) defines product requirements. **GitHub Issues are authoritative for actual owners, deadlines, status and approved changes.** Week 0 is an approved exception: Discord holds the deadline/updates and individual PRs into `deliverable0` record submissions and review. No Issue is required; the PM can link PRs to an Issue later. This document describes the process and proposed specialties, not a separate task tracker.
 
 New to GitHub? Use [the beginner walkthrough](../CONTRIBUTING.md#new-to-github): [PM Issue creation](../CONTRIBUTING.md#create-an-issue-pms), [member Issue use](../CONTRIBUTING.md#use-an-issue-members) and [PR submission](../CONTRIBUTING.md#open-a-pull-request-members).
 
 ## How a deliverable is created
+
+The steps below apply to future Issue-based deliverables. For Week 0, publish the reviewed starter on `deliverable0`, announce the assignment/deadline in Discord and collect individual PRs; use [the PM release steps](../CONTRIBUTING.md#release-week-0-pms).
 
 1. PMs choose a small, approved step toward a semester milestone. State what members should learn or implement and what is out of scope; do not add new features, data sources or dependencies implicitly.
 2. Open the GitHub Issue with the goal, deadline, prerequisites, member/team assignments, file/output expectations, dependencies and a concrete acceptance checklist. Identify whether submission is individual or coordinated team work.
@@ -60,19 +62,19 @@ The roster below replaces earlier proposed member groupings. Suggested focus des
 
 ## What each member is assigned for Week 0
 
-All nine members in Teams A/B/C complete **the same individual [onboarding assignment](week0/week-00-onboarding.md)**. Team specialties do not change this week's task:
+All members complete **the same individual [onboarding assignment](week0/week-00-onboarding.md)**. Team specialties do not change this week's task:
 
 - Set up local Python 3.12 and pass environment verification.
 - Complete [Docker/PostgreSQL setup](../docs/SETUP.md), show a healthy service, run `SELECT 1;` and stop it safely with persistent storage intact.
 - Copy `weekly/week0/onboarding.py` to `weekly/week0/<github-handle>_onboarding.py`.
 - Complete the inspection, minimum-games filter, scoring rank and Plotly chart TODOs using API or synthetic backup data.
-- Add two interpretation/limitation comments and attach terminal/chart evidence to an individual PR.
+- Submit your personal script through an individual PR and briefly summarize the verification results in its description. No screenshots or attachments are required for Week 0.
 
 There is no required proposal, notebook, database schema/ingestion or editor for Week 0. Docker runs PostgreSQL only; Python stays local. Future Issues specify the exact member/team implementation tasks; the suggested focus above is not an automatic future assignment.
 
 ## What the Co-PM checks
 
-Cemal or the designated reviewer checks the Issue's acceptance criteria against the actual diff and reproducible output. Screenshots support the review but do not replace checking the code.
+Cemal or the designated reviewer checks the assignment's acceptance criteria (the Week 0 checklist, or the Issue for future tasks) against the actual diff and reproducible output. For Week 0, review the submitted script, run it, and read the member's verification summary; screenshots are not required.
 
 | Check | What must be verified |
 | --- | --- |
@@ -81,19 +83,19 @@ Cemal or the designated reviewer checks the Issue's acceptance criteria against 
 | Correctness | Calculations match definitions and units; relevant edge cases and important results have meaningful checks |
 | Data and charts | Source, season/period and axes are clear; synthetic data is labeled; missing/failing data is handled appropriately |
 | Collaboration | Agreed team inputs/outputs match; each member's contribution is identifiable; integration does not break existing features |
-| Submission | PR targets the correct integration branch, links its Issue and includes evidence; review feedback is addressed |
+| Submission | PR targets the correct integration branch, summarizes verification results and links its Issue when one exists; review feedback is addressed |
 | Repository hygiene | No real datasets, environments, generated caches or credentials; no unapproved dependency/source/scope changes |
 
-**Week 0 specifically:** confirm Python verification, healthy Docker/PostgreSQL and successful `SELECT 1;` evidence; confirm the member can stop/restart without deleting data and has not submitted `.env` or volume files. Then run the member script; confirm `GP >= 20` includes the boundary; verify the top five uses descending `PTS_PER_GAME`; check the chart matches those rows and identifies API/backup correctly; read the two comments; confirm only the member script is submitted. API failure with a clearly labeled working backup is acceptable. Shared starter/backup files should remain unchanged.
+**Week 0 specifically:** confirm Python verification, healthy Docker/PostgreSQL and the reported successful `SELECT 1;` result; confirm the member can stop/restart without deleting data and has not submitted `.env` or volume files. Then run the member script; confirm `GP >= 20` includes the boundary; verify the top five uses descending `PTS_PER_GAME`; check the chart matches those rows and identifies API/backup correctly; confirm only the member script is submitted. API failure with a clearly labeled working backup is acceptable. Shared starter/backup files should remain unchanged.
 
 If something is incomplete, request specific changes and recheck the affected behavior after the member updates the PR. Do not mark the Issue complete merely because its deadline passed.
 
 ## How work is submitted
 
-- **Individual work:** each member uses `issue-<n>/<member-slice>` and unique filenames specified by the assignment. Week 0 uses `issue-<n>/onboarding-<github-handle>` and one member script.
+- **Individual work:** each member uses `issue-<n>/<member-slice>` and unique filenames specified by the assignment. Week 0 uses `deliverable0-<github-handle>` and one member script, with the PR targeting `deliverable0`.
 - **Team work:** split the Issue into small member-owned feature slices. Each slice has its own feature branch/PR into the same Issue integration branch. Name the contributor(s), handoff and reviewer in the Issue/PR; do not hide all work in one indistinguishable submission. A pair-owned slice is acceptable when explicitly assigned.
-- **PR contents:** explain what changed, link the Issue, give the exact verification command/result and include relevant screenshots or output. Stage only the assigned source files; generated chart/data outputs stay local.
+- **PR contents:** explain what changed, link the Issue when one exists, give the relevant verification commands and briefly summarize their results. Week 0 requires no screenshots or attachments. Stage only the assigned source files; generated chart/data outputs stay local.
 - **Shared Issues:** use `Related to #<n>` so one member's submission does not close the whole team assignment. Reserve closing the Issue for completion of all required slices and the PM's final review.
-- **Review and merge:** request a teammate/Co-PM review, address any configured automated-review feedback, and merge feature → integration only after approval. PMs review integration → `main` when all required work is collected and verified.
+- **Review and merge:** request a teammate/Co-PM review, address any configured automated-review feedback, and merge feature → integration only after approval. PMs review integration → `main` when all required work is collected and verified. For Week 0, `deliverable0` is that shared integration branch.
 
-The actual Issue number is supplied by the PM; `<n>` is a placeholder. Follow CONTRIBUTING for worktree, synchronization, commit/push and cleanup commands. Members submit PRs; they do not push directly to `main`.
+For future tasks the actual Issue number is supplied by the PM; `<n>` is a placeholder. Week 0 needs no Issue number; members share PR links and blockers in Discord. Follow CONTRIBUTING for worktree, synchronization, commit/push and cleanup commands. Members submit PRs; they do not push directly to `main`.
