@@ -1,6 +1,6 @@
 # Week 00 — Python, PostgreSQL setup and NBA data practice
 
-**Deliverable 0 · Individual · Time estimate: about 70–90 minutes with Python/Git/Docker installed. First-time Docker installation, WSL setup or restarts may add another 30 minutes or more.** The PM announces the deadline and updates in Discord. Week 0 uses individual PRs into `deliverable0`; no GitHub Issue is required yet. Use any text editor; this assignment is a regular Python script. Expected time: environment setup 20–40 minutes, coding/chart 30 minutes, and GitHub submission 20 minutes. Installation or troubleshooting can take longer.
+**Deliverable 0 · Individual · Time estimate: about an hour First-time Docker installation, WSL setup or restarts may add another 30 minutes or more.** The PM announces the deadline and updates in Discord. Week 0 uses individual PRs into `deliverable0`; no GitHub Issue is required yet. Use any text editor; this assignment is a regular Python script. Expected time: environment setup 20–40 minutes, coding/chart 30 minutes, and GitHub submission 20 minutes. Installation or troubleshooting can take longer.
 
 All 10 members complete the same individual exercise this week; later team specializations and Co-PM review responsibilities are described in [the deliverable structure](../deliverables_strucutre.md).
 
