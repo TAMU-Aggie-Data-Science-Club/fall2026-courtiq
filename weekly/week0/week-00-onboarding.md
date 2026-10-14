@@ -8,13 +8,13 @@ All 10 members complete the same individual exercise this week; later team speci
 
 If GitHub is new to you, first read [the GitHub terms and PR walkthrough](../../CONTRIBUTING.md#new-to-github). Your **PR** is the request to review your completed code.
 
-Read the PM's Discord announcement for the deadline and assignment link. Each member submits independently by submitting a PR for their branch; you do not need an Issue number or Issue link for deliverable 0. Future tasks will be assigned, tracked, and completed using GitHub Projects and Issues.
+This assignment should be completed by Friday 11:59PM, Oct 16th 2026, in order to diagnose issues early on. Each member submits independently by submitting a PR for their branch; you do not need an Issue number or Issue link for deliverable 0. Future tasks will be assigned, tracked, and completed using GitHub Projects and Issues.
 
 Open PowerShell/Command Prompt on Windows or Terminal on macOS/Linux. Copy only the commands inside each code block, paste one at a time and press Enter after each. `cd` changes the folder you are working in; a successful command may print nothing.
 
 Install [Python 3.12](https://www.python.org/downloads/) and [Git](https://git-scm.com/downloads/). Accept your repository invitation and make sure you can push feature branches. The PM must first publish the reviewed starter files on the shared `deliverable0` branch. Repository Write access is required to push the feature branches used below; ask the PM if your invitation or permissions are missing.
 
-**Before running the commands below**, replace `your-handle` with your GitHub username (the `@name` on your profile, not your full display name). If you have already cloned the repo, enter its folder and start at `git fetch origin`.
+**Before running the commands below**, replace `your-handle` with your GitHub username (the `@name` on your profile, not your full display name). If you have already cloned the repo, enter its folder and start at `git fetch origin`. Additionally, in order to have access permission to the GitHub repo, please join through the link provided in #announcements on the CourtIQ Discord.
 
 ```sh
 git clone https://github.com/TAMU-Aggie-Data-Science-Club/fall2026-courtiq.git
@@ -24,7 +24,7 @@ git worktree add -b deliverable0-your-handle ../courtiq-your-handle origin/deliv
 cd ../courtiq-your-handle
 ```
 
-The commands download the repo, learn about the PM's remote branches, create your feature branch in a separate worktree folder, then enter that folder. Confirm your branch:
+The commands download the repo, learn about the PM's remote branches, create your feature branch in a separate worktree folder, then enter that folder. Like `git checkout -b`, `git worktree add -b` creates and checks out a new branch; a worktree uses a separate folder, while checkout switches the branch in your current folder. Both folders share the same Git history. Confirm your branch:
 
 ```sh
 git branch --show-current
