@@ -62,7 +62,7 @@ def main():
 
     # TODO 4: Create a px.bar figure using top_five.
     # Use PLAYER_NAME for x and PTS_PER_GAME for y.
-    fig = None
+    fig = px.bar(top_five, x="PLAYER_NAME", y="PTS_PER_GAME")
     if fig is None:
         print("Next: complete TODO 4 to create the chart.")
         return
