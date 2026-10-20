@@ -2,7 +2,7 @@
 
 > **How to read this file.** This is the PMs' best current estimate of what CourtIQ needs to ship and roughly when. It is a **living plan, not a contract**. Future task tracking lives in **GitHub Issues and the Project board**. Week 0 uses the PM's Discord announcement and reviewed PRs into `deliverable0`.
 
-This file is the high-level semester roadmap. Detailed weekly instructions live in the [weekly assignment index](weekly/README.md). [The deliverable structure](weekly/deliverables_strucutre.md) describes creation, proposed team responsibilities and review. Individual GitHub Issues remain authoritative for owners, task status, deadlines and changes; weekly documents explain the work and link to those issues. Week 0 requires no Issue; its deadline/updates are announced in Discord and individual submissions are reviewed through PRs into `deliverable0`.
+This file is the high-level semester roadmap. Detailed weekly instructions live in the [weekly assignment index](weekly/README.md). [The deliverable structure](weekly/deliverables_structure.md) describes creation, proposed team responsibilities and review. Individual GitHub Issues remain authoritative for owners, task status, deadlines and changes; weekly documents explain the work and link to those issues. Week 0 requires no Issue; its deadline/updates are announced in Discord and individual submissions are reviewed through PRs into `deliverable0`.
 
 ## Milestones
 

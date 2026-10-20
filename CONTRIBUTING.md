@@ -10,6 +10,8 @@ This guide explains how the Aggie Data Science Club team uses GitHub, including 
 
 **First assignment:** follow [Week 00](weekly/week0/week-00-onboarding.md). Week 0 is the PM-approved exception to the Issue requirement: each member submits their own Python script through a feature PR into `deliverable0`, with deadline/help in Discord. Future work follows the Issue-based workflow below.
 
+**Week 1:** follow [NBA data and visual prototypes](weekly/week1/week-01-player-team-prototypes.md). Members submit their named TODO function in a shared app module plus a personal brainstorming document; Cemal coordinates reviews and performs feature-to-integration merges/conflict resolution. This assignment-specific ownership overrides member merge/cleanup steps below; PMs retain final review into `main`.
+
 ---
 
 ## Table of Contents

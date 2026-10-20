@@ -32,7 +32,7 @@ If the core application is completed ahead of schedule, the project may also exp
 | Compare | Two players or two teams; normalized metrics and interactive charts with fair comparison context |
 | Trends | Rolling averages and recent-versus-season views that explain changes without overstating noise |
 
-**Implemented now:** four-section Streamlit navigation with explicitly labeled placeholders, shared environment, local PostgreSQL with a reproducible fictional starter table, private admin/read-only credentials, checked backups/recovery and onboarding materials. **Planned:** application data collection, analytics, product charts and production NBA schemas/storage. The onboarding script has a separate optional API request for classroom practice. The synthetic backup is teaching material only.
+**Implemented now:** four-section Streamlit navigation with movable Week 1 Players/Teams placeholder blocks, independent component previews, an explicit local NBA snapshot command and clearly labeled fictional practice inputs, shared environment, local PostgreSQL with a reproducible fictional starter table, private admin/read-only credentials, checked backups/recovery and onboarding materials. **Planned:** application data collection, analytics, product charts and production NBA schemas/storage. The onboarding script has a separate optional API request for classroom practice. The synthetic backup is teaching material only.
 
 ## Selected tech stack
 
@@ -61,6 +61,8 @@ python -m streamlit run app.py
 Open `http://localhost:8501` and use the sidebar. On Windows use `py -3.12 -m venv .venv` and `.\.venv\Scripts\Activate.ps1`, then the same `python` commands. See [Week 00](weekly/week0/week-00-onboarding.md) for cloning, the required database check and the first coding exercise.
 
 After installing Docker and activating `.venv`, `python scripts/database.py setup` prepares the local database, generates private passwords, loads the same fictional data for everyone and installs daily backup checks. Use `python scripts/database.py status` to verify it, and `python scripts/database.py backup` for an immediate archive. [Setup and recovery](docs/SETUP.md#7-backups-and-recovery) explain restoration into a separate database and the limits of local backups. Each member's database is independent; future hosting provides shared data for the deployed application.
+
+For the current development increment, use [Week 1: NBA data and visual prototypes](weekly/week1/week-01-player-team-prototypes.md): movable Players/Teams blocks, named TODO functions in the app modules and a personal brainstorming copy. These are teaching previews, not completed product profiles.
 
 Browse the [weekly assignments](weekly/README.md), starting with [Deliverable 0](weekly/week0/week-00-onboarding.md) before the first meeting. Copy [weekly/week0/onboarding.py](weekly/week0/onboarding.py), run it with Python, and complete its TODOs using the prepared API request or synthetic backup.
 
@@ -103,10 +105,11 @@ See [`DELIVERABLES.md`](DELIVERABLES.md) for the deliverable breakdown and timel
 | [Development setup](docs/SETUP.md) | Local Python plus Docker/PostgreSQL installation, health/SQL verification, shutdown and troubleshooting. |
 | [PostgreSQL Compose](compose.yaml) | One local database service with persistent storage; configure your private `.env` from [.env.example](.env.example). |
 | [Database tools](scripts/database.py) | Provided setup/fixture loader, read-only application access, checked backups, scheduling and recovery; [starter schema](scripts/database.sql). |
-| [Deliverable structure](weekly/deliverables_strucutre.md) | How assignments are created, proposed team responsibilities, Co-PM checks and submission. |
+| [Deliverable structure](weekly/deliverables_structure.md) | How assignments are created, proposed team responsibilities, Co-PM checks and submission. |
 | [Weekly assignments](weekly/README.md) | Assignment index and reusable template; Week 0 uses Discord/PRs, future work uses GitHub Issues. |
 | [Week 00 / Deliverable 0](weekly/week0/week-00-onboarding.md) | Complete individual pre-meeting assignment, setup and submission instructions. |
 | [Architecture](ARCHITECTURE.md) | Product plan, module boundaries, MVP/later requirements and status. |
+| [`src/`](src/) | Application data, analytics, charts and views; member names mark the current TODO functions. |
 | [Onboarding script](weekly/week0/onboarding.py) | Start here for basic coding with prepared NBA API loading or synthetic backup. |
 | [Verification script](scripts/verify_environment.py) | Offline environment and fixture smoke check. |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | **Start here.** Beginner terms, click-by-click Issue/PR guidance and the team contribution workflow. |
@@ -118,7 +121,7 @@ See [`DELIVERABLES.md`](DELIVERABLES.md) for the deliverable breakdown and timel
 
 ## Team
 
-The proposed member roster and team responsibilities are in [the deliverable structure](weekly/deliverables_strucutre.md). [`CODEOWNERS`](CODEOWNERS) defines the repository review policy; PMs own the final integration-to-`main` review.
+The numbered member groups and current assignment links are in [the deliverable structure](weekly/deliverables_structure.md). [`CODEOWNERS`](CODEOWNERS) defines the repository review policy; PMs own the final integration-to-`main` review.
 
 ## Notes for PMs
 
