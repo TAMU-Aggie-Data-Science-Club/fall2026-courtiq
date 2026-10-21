@@ -32,7 +32,7 @@ If the core application is completed ahead of schedule, the project may also exp
 | Compare | Two players or two teams; normalized metrics and interactive charts with fair comparison context |
 | Trends | Rolling averages and recent-versus-season views that explain changes without overstating noise |
 
-**Implemented now:** four-section Streamlit navigation with movable Week 1 Players/Teams placeholder blocks, independent component previews, an explicit local NBA snapshot command and clearly labeled fictional practice inputs, shared environment, local PostgreSQL with a reproducible fictional starter table, private admin/read-only credentials, checked backups/recovery and onboarding materials. **Planned:** application data collection, analytics, product charts and production NBA schemas/storage. The onboarding script has a separate optional API request for classroom practice. The synthetic backup is teaching material only.
+**Implemented now:** four-section Streamlit navigation with movable Week 1 Players/Teams placeholder blocks, independent component previews, an explicit real NBA season-snapshot collection command and clearly labeled fictional practice inputs, shared environment, local PostgreSQL with a reproducible fictional starter table, private admin/read-only credentials, checked backups/recovery and onboarding materials. **Planned:** production collection/refresh, member analytics and charts, integrated product profiles and production NBA schemas/storage. Week 1 requires EDA and verification using the real snapshots; the separate fictional database is not its input. The onboarding script has a separate optional API request for classroom practice.
 
 ## Selected tech stack
 
@@ -112,7 +112,7 @@ See [`DELIVERABLES.md`](DELIVERABLES.md) for the deliverable breakdown and timel
 | [`src/`](src/) | Application data, analytics, charts and views; member names mark the current TODO functions. |
 | [Onboarding script](weekly/week0/onboarding.py) | Start here for basic coding with prepared NBA API loading or synthetic backup. |
 | [Verification script](scripts/verify_environment.py) | Offline environment and fixture smoke check. |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | **Start here.** Beginner terms, click-by-click Issue/PR guidance and the team contribution workflow. |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | **Start here.** GitHub terms, click-by-click Issue/PR guidance and the team contribution workflow. |
 | [`DELIVERABLES.md`](DELIVERABLES.md) | Current project milestones and rough timeline. A living plan, not a contract.                                                                   |
 | [`DATA.md`](DATA.md)                 | Selected data sources, how to access them, and guidelines for using them.                                                                       |
 | [`data/`](data/)                     | Local working folder for datasets. **Git-ignored** — raw data is never committed.                                                               |
@@ -129,4 +129,4 @@ This README, [`DELIVERABLES.md`](DELIVERABLES.md), and [`DATA.md`](DATA.md) desc
 
 ## Notes for members
 
-New to GitHub? Start with [the beginner terms and walkthrough](CONTRIBUTING.md#new-to-github). Follow the PM's Discord announcement and [Week 0](weekly/week0/week-00-onboarding.md); submit your individual PR into `deliverable0`. Week 0 does not require an Issue.
+New to GitHub? Start with [GitHub terms and walkthrough](CONTRIBUTING.md#new-to-github). Follow the PM's Discord announcement and [Week 0](weekly/week0/week-00-onboarding.md); submit your individual PR into `deliverable0`. Week 0 does not require an Issue.

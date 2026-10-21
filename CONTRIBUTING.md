@@ -129,6 +129,8 @@ This is the workflow for publishing project changes. Week 0 follows the same rev
 
 ## Staying in sync
 
+**Week 1:** start from the PM-published `issue-11/integration` branch using the assignment's worktree commands. Cemal handles branch synchronization and merge conflicts; members keep working on their feature branches. The general `main`/rebase guidance below does not override that assignment.
+
 **This is the most common source of pain, so do it reflexively.** GitHub is the source of truth, not your laptop. Before you start any work — and regularly while you work — pull the latest:
 
 ```sh

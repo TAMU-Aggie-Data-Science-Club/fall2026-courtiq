@@ -70,6 +70,8 @@ def load_snapshot(kind, demo=False):
                 or datetime.fromisoformat(metadata["retrieved_at"]).tzinfo is None
                 or metadata.get("sha256") != hashlib.sha256(raw_text.encode()).hexdigest()):
             raise ValueError("Snapshot metadata does not match the Week 1 request.")
+        if not isinstance(metadata["parameters"], dict):
+            raise ValueError("Malformed snapshot parameters; ask Cemal before replacing the files.")
         if any(metadata["parameters"].get(key) != value for key, value in expected_parameters.items()):
             raise ValueError("Snapshot parameters mix periods, units or statistic types.")
         results = payload["resultSets"]
@@ -85,7 +87,7 @@ def load_snapshot(kind, demo=False):
             f"python -m scripts.fetch_data {kind}. "
             "Use the labeled practice option to develop offline."
         ) from None
-    except (KeyError, TypeError, json.JSONDecodeError) as exc:
+    except (KeyError, IndexError, TypeError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise ValueError(f"Malformed {kind} snapshot; ask Cemal before replacing it.") from exc
 
 

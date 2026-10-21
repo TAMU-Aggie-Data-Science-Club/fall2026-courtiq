@@ -2,7 +2,7 @@
 
 This is the shared guide for creating assignments, dividing responsibilities and reviewing submissions. [DELIVERABLES.md](../DELIVERABLES.md) remains the semester roadmap; [ARCHITECTURE.md](../ARCHITECTURE.md) defines product requirements. **GitHub Issues are authoritative for actual owners, deadlines, status and approved changes.** Week 0 is an approved exception: Discord holds the deadline/updates and individual PRs into `deliverable0` record submissions and review. No Issue is required; the PM can link PRs to an Issue later. This document describes the process and proposed specialties, not a separate task tracker.
 
-New to GitHub? Use [the beginner walkthrough](../CONTRIBUTING.md#new-to-github): [PM Issue creation](../CONTRIBUTING.md#create-an-issue-pms), [member Issue use](../CONTRIBUTING.md#use-an-issue-members) and [PR submission](../CONTRIBUTING.md#open-a-pull-request-members).
+New to GitHub? Use [the GitHub walkthrough](../CONTRIBUTING.md#new-to-github): [PM Issue creation](../CONTRIBUTING.md#create-an-issue-pms), [member Issue use](../CONTRIBUTING.md#use-an-issue-members) and [PR submission](../CONTRIBUTING.md#open-a-pull-request-members).
 
 ## How a deliverable is created
 
@@ -18,7 +18,7 @@ Each assignment should answer: **Who does what? What must it produce? What depen
 
 ## Numbered teams and assignment ownership
 
-Team numbers identify groups, not permanent specialties. Weekly Issues assign actual tasks; experience guides starter examples and support, not grading. Members propose ideas together and own clearly marked functions in the shared application modules. Names and TODO comments identify each member's section; Cemal handles integration conflicts. The [Week 1 guide](week1/week-01-player-team-prototypes.md) defines the current allocation.
+Team numbers identify groups, not permanent specialties. Weekly Issues assign actual tasks; starter examples and support are available to everyone. Members propose ideas together and own clearly marked functions in the shared application modules. Names and TODO comments identify each member's section; Cemal handles integration conflicts. The [Week 1 guide](week1/week-01-player-team-prototypes.md) defines the current allocation.
 
 ### Leadership
 
@@ -26,27 +26,21 @@ Team numbers identify groups, not permanent specialties. Weekly Issues assign ac
 
 ### Team 1
 
-| Member | Year | Experience |
-| --- | --- | --- |
-| Aiden Jackson 
-| Ignacio Wijatno 
-| Andrew Mok 
+- Aiden Jackson
+- Ignacio Wijatno
+- Andrew Mok
 
 ### Team 2
 
-| Member | Year | Experience |
-| --- | --- | --- |
-| June Hwang 
-| Jason Q. Koffi 
-| Sri Abhinav Thatavarthi 
+- June Hwang
+- Jason Q. Koffi
+- Sri Abhinav Thatavarthi
 
 ### Team 3
 
-| Member | Year | Experience |
-| --- | --- | --- |
-| Michael Du 
-| Casey Hawkings 
-| Jack Dunlap
+- Michael Du
+- Casey Hawkings
+- Jack Dunlap
 
 ### Shared boundaries
 

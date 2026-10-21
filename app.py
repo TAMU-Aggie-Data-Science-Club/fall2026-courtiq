@@ -51,7 +51,7 @@ def empty_visual(title, description):
 
 def show_result(result, owner):
     if result is None:
-        st.caption("Component preview is not available yet.")
+        st.caption("No preview returned. The function may be unfinished or this selection has no result.")
     elif isinstance(result, pd.DataFrame):
         st.dataframe(result, hide_index=True, use_container_width=True)
     elif isinstance(result, Figure):
@@ -86,8 +86,8 @@ if section in ("Players", "Teams"):
     ratings = inputs("ratings", demo) if active and not player_page else None
     if demo:
         st.warning("SYNTHETIC practice data — all names and values are invented.")
-    elif primary:
-        metadata = primary[2]
+    elif primary or ratings:
+        metadata = (primary or ratings)[2]
         st.caption(f"{metadata['source']} · {metadata['season']} · {metadata['season_type']} · "
                    f"Retrieved {metadata['retrieved_at']}")
     else:
@@ -95,7 +95,8 @@ if section in ("Players", "Teams"):
 
     with st.container(border=True):
         if primary:
-            preview(views.render_player_profile if player_page else views.render_team_profile, primary[1], primary[2])
+            preview(views.render_player_profile if player_page else views.render_team_profile,
+                    primary[1].copy(), primary[2].copy())
         else:
             select, season = st.columns([3, 1])
             with select:
@@ -115,6 +116,9 @@ if section in ("Players", "Teams"):
                    else "A team's offensive and defensive performance in league context.")
         chart_data = primary if player_page else ratings
         if chart_data:
+            if not player_page and not demo and primary:
+                st.caption(f"Ratings source: {chart_data[2]['source']} · "
+                           f"Retrieved {chart_data[2]['retrieved_at']}")
             frame = chart_data[1]
             id_column = "PLAYER_ID" if player_page else "TEAM_ID"
             name_column = "PLAYER_NAME" if player_page else "TEAM_NAME"

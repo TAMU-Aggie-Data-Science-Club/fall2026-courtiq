@@ -1,5 +1,6 @@
 """Streamlit profile components; calculations and collection belong elsewhere."""
 
+import pandas as pd
 import streamlit as st
 
 
@@ -15,6 +16,7 @@ def render_player_profile(frame, metadata):
     #                         key="profile_player")
     # TODO 2: Select that row; display GP and points/rebounds/assists per game.
     # Use st.columns and st.metric. For missing values display "Unavailable", not 0.
+    # Hint: pd.isna(value) tells you whether a displayed statistic is missing.
     # Example: st.metric("Example label", "12.3")
     # TODO 3: Caption source/season/type/retrieval time. No collection or formulas here.
     st.info("June: implement the player selector and season summary in render_player_profile().")
@@ -31,6 +33,7 @@ def render_team_profile(frame, metadata):
     # st.selectbox("Team", list(labels), format_func=labels.get, key="profile_team")
     # TODO 2: st.metric for GP, wins, losses, and source W_PCT (format as a percent).
     # Display the three per-game averages too; handle missing values explicitly.
+    # Hint: pd.isna(value) checks missingness before you format the number.
     # Example: f"{0.625:.1%}" → "62.5%". This formats, rather than recalculates, a value.
     # TODO 3: Display source, season/type and retrieval time. No analytics formulas here.
     st.info("Casey: implement team selection and the record summary in render_team_profile().")

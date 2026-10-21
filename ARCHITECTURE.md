@@ -48,7 +48,7 @@ scripts/database.sql           # fictional starter table; production schemas rem
 scripts/verify_environment.py  # implemented offline verification
 weekly/week0/onboarding.py           # implemented guided script; student TODOs unanswered
 weekly/week0/player_stats_backup.csv # fictional teaching data
-weekly/week1/                  # assignment guide, personal brainstorming template and PM notes
+weekly/week1/                  # assignment guide and personal brainstorming template
 weekly/                        # assignment index and reusable template
 src/data.py                # snapshot I/O, shared input shapes; Aiden/Ignacio/Andrew TODOs
 src/analytics.py           # deterministic percentile/rating calculations; Sri/Michael TODOs
@@ -61,6 +61,8 @@ data/raw/, interim/, processed/ # ignored local NBA responses and derived tables
 ```
 
 For Week 1, each member owns a named TODO function in a shared application module. Supplied table shapes allow independent previews without calling another unfinished function. Students edit only their function body and a personal brainstorming copy; module imports, shared helpers and page wiring stay PM-owned. Cemal consolidates validated components and handles shared-file merge conflicts. The package now holds the assigned application components; production ingestion and database schemas remain future work.
+
+Week 1 acceptance requires real NBA data exploration, cleanup and preliminary calculations/visuals. Synthetic inputs support development and unusual-case checks only. The existing PostgreSQL teaching table is separate; database ingestion is not required for this week's EDA.
 
 Collection owns endpoint parameters, IDs, units and freshness. Analytics receives tables, documents formulas/cohorts and does not fetch data or render UI. Charts receive analytics outputs and label axes/periods. UI owns navigation, user inputs, empty states and explanatory context; it does not duplicate formulas. Approved calculations from onboarding move to ordinary functions for testing and reuse. Schema naming and database design are later review decisions, not silently fixed by this suggested structure.
 
