@@ -18,7 +18,10 @@ def calculate_percentiles(frame):
     # Use the one supplied practice table: ID 103 is excluded, PTS_PCTL for ID 102
     # is about 83.33, and AST_PCTL for ID 104 stays missing. No extra fixture needed.
     # Empty input returns an empty DataFrame with those same columns.
-    return None
+    eligible = frame.loc[frame["GP"] >= 20].copy()
+    for metric, percentile in zip(METRICS, ["PTS_PCTL", "REB_PCTL", "AST_PCTL"]):
+        eligible[percentile] = eligible[metric].rank(method="average", pct=True) * 100
+    return eligible[["PLAYER_ID", "SEASON", "PTS_PCTL", "REB_PCTL", "AST_PCTL"]]
 
 
 # Owner: Michael Du — edit only this function body.
