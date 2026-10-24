@@ -113,17 +113,45 @@ def audit_source(frame):
 
 
 # Owner: Ignacio Wijatno — edit only this function body.
-def clean_players(raw, season):
-    """Return one row per SEASON/PLAYER_ID with the canonical player fields."""
-    # TODO(Ignacio) 1: Check required fields, then work on raw[FIELDS["players"]].copy().
-    # TODO 2: Convert IDs/GP/PTS/REB/AST with pd.to_numeric(..., errors="raise").
-    # Reject missing/duplicate PLAYER_ID. Preserve missing metrics as missing.
-    # Hint: frame["PLAYER_ID"].isna().any(); frame.duplicated(["PLAYER_ID"]).any().
-    # Deferred before production/database use: name, integer/range and infinity checks.
-    # TODO 3: Add SEASON, rename PTS/REB/AST to *_PER_GAME, print before/after counts.
-    # PerGame fields are ALREADY averages. No division by GP and no fillna(0).
-    # Example: pd.to_numeric(pd.Series(["2", "3"]), errors="raise")
-    return None
+def clean_players(raw: pd.DataFrame, season: str) -> pd.DataFrame:
+    """
+    Return one row per SEASON/PLAYER_ID with the canonical player fields.
+    
+    Parameters:
+        raw: The raw DataFrame loaded from the player stats source.
+        season: The season string (e.g., '2025-26').
+        
+    Returns:
+        A cleaned DataFrame with normalized numeric columns, validated IDs, 
+        added season, and renamed per-game statistics.
+    """
+
+    # 1. Make sure raw data has all fields in FIELDS["players"]
+    missing = set(FIELDS["players"]) - set(raw.columns)
+    if missing:
+        raise ValueError(f"Missing required player fields from raw data: {sorted(missing)}")
+
+    # 2. Copy player data
+    frame = raw[FIELDS["players"]].copy()
+
+    # 3. Convert columns to numeric data
+    for col in ["PLAYER_ID", "GP", "PTS", "REB", "AST"]:
+        frame[col] = pd.to_numeric(frame[col], errors="raise")
+
+    # 4. Throw errors for missing/duplicate PLAYER_IDs
+    if frame["PLAYER_ID"].isna().any():
+        raise ValueError(f"Data contains missing PLAYER_IDs")
+    if frame.duplicated(["PLAYER_ID"]).any():
+        raise ValueError(f"Duplicated PLAYER_IDs found")
+
+    # 5. Add SEASON col, rename PTS/REB/AST for clarity
+    frame["SEASON"] = season
+
+    print(f"Before cleaning: {frame.shape}")
+    frame.rename(columns={"PTS": "PTS_PER_GAME", "REB": "REB_PER_GAME", "AST": "AST_PER_GAME"}, inplace=True)
+    print(f"After cleaning: {frame.shape}")
+
+    return frame
 
 
 # Owner: Andrew Mok — edit only this function body.
