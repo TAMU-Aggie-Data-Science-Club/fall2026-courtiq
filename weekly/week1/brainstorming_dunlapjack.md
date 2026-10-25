@@ -20,7 +20,7 @@ Copy to `brainstorming_<github-handle>.md`; keep this template unchanged. Short 
 ## After the meeting — shared plan, my contribution
 
 - **Issue comment/link recording the team's agreed wireframe:** Unknown
-- **What moves, gets larger, or changes in my block; why:** Unknown
+- **What moves, gets larger, or changes in my block; why:** Kept the reversed y-axis. Ignacio agreed top right reads as best.
 - **Agreed column names and which component will use my result:** Teams -> League Efficiency
 - **My new idea is:** Comparison feature, similar to the "Matchup Matrix" in the website linked above, that can analyze how players perform vs each other using advanced per possession defensive data. Useful for highlighting offensive-favored, defender-favored, new, historical, and unique matchups across the league.
 - **Additional data/effort if we adopt that idea:** Find a source for the per possession data. Import this data and create a user-friendly visualization to make the data useful.
@@ -29,5 +29,5 @@ Copy to `brainstorming_<github-handle>.md`; keep this template unchanged. Short 
 
 - **Real-data command/result and one descriptive observation:** `python -m scripts.preview_component team-chart --id 1610612760` → saved chart of all 30 teams (2025-26 Regular Season) with the Oklahoma City Thunder highlighted. Observation: the Thunder have the league's lowest defensive rating (106.5) and best net rating (+11.1), while Denver has the highest offensive rating (121.2). 12 teams are better than average on both sides and 10 are worse on both. This describes where teams sit; it doesn't explain why.
 - **Unusual case checked** (e.g. missing value or empty table) **and expected/actual result:** (1) Unknown team ID `--id 999` → expected no chart; got `NO OUTPUT`. (2) Empty table → expected `None`; got `None`. (3) One team's DEF_RATING set to missing → expected that team to be left off and the other 29 plotted; got 29 points, and selecting the missing team returned `None`. The input table was unchanged afterward.
-- **Teammate/component I reviewed; did its result fit what the next component needs? One finding:** TODO(Jack)
+- **Teammate/component I reviewed; did its result fit what the next component needs? One finding:** Ignacio: clean_players() in src/data.py. The output columns match the Player table the app expects (PLAYER_ID, PLAYER_NAME, GP, PTS_PER_GAME, REB_PER_GAME, AST_PER_GAME, SEASON). Finding: the “Before cleaning” print runs right before the “After cleaning” print, with only a rename in between, so both always show the same shape. Moving it to the start would show the real before/after: columns trimmed to the 7 required, and the same row count, confirming no players were lost.
 - **Remaining blocker or connection needed next week:** None blocking. On Windows, `fetch_data` saves the data but then crashes printing "→" (UnicodeEncodeError); setting `PYTHONUTF8=1` should avoid it (not retested, to avoid a second request). Next week: connect Michael's checked ratings to this chart.
