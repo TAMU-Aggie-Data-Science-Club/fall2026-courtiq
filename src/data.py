@@ -125,7 +125,6 @@ def clean_players(raw: pd.DataFrame, season: str) -> pd.DataFrame:
         A cleaned DataFrame with normalized numeric columns, validated IDs, 
         added season, and renamed per-game statistics.
     """
-
     # 1. Make sure raw data has all fields in FIELDS["players"]
     missing = set(FIELDS["players"]) - set(raw.columns)
     if missing:
@@ -133,6 +132,7 @@ def clean_players(raw: pd.DataFrame, season: str) -> pd.DataFrame:
 
     # 2. Copy player data
     frame = raw[FIELDS["players"]].copy()
+    print(f"Before cleaning: {frame.shape}")
 
     # 3. Convert columns to numeric data
     for col in ["PLAYER_ID", "GP", "PTS", "REB", "AST"]:
@@ -147,7 +147,6 @@ def clean_players(raw: pd.DataFrame, season: str) -> pd.DataFrame:
     # 5. Add SEASON col, rename PTS/REB/AST for clarity
     frame["SEASON"] = season
 
-    print(f"Before cleaning: {frame.shape}")
     frame.rename(columns={"PTS": "PTS_PER_GAME", "REB": "REB_PER_GAME", "AST": "AST_PER_GAME"}, inplace=True)
     print(f"After cleaning: {frame.shape}")
 
