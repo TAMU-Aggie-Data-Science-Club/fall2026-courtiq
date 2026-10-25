@@ -1,7 +1,7 @@
 # Week N — Title
 
 **Issue:** [Actual GitHub Issue URL] · **Effort:** [Estimate]
-Owners, deadlines and status live in the issue. Follow [the deliverable structure](deliverables_strucutre.md). Copy this template into `weekly/weekN/` and update that link to `../deliverables_strucutre.md`.
+Owners, deadlines and status live in the issue. Follow [the deliverable structure](deliverables_structure.md). Copy this template into `weekly/weekN/` and update that link to `../deliverables_structure.md`.
 
 ## Setup
 

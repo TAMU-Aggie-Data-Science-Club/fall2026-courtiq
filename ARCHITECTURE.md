@@ -6,7 +6,7 @@ CourtIQ helps casual NBA fans and people comparing player/team performance under
 
 ## Current implementation status
 
-Implemented in this starter: a runnable Streamlit navigation shell in [app.py](app.py), a shared local Python environment, PostgreSQL-only Docker Compose setup, a guided Python onboarding script with synthetic backup and a prepared optional NBA API request. The shell has **no data retrieval, calculations, charts or database connection**. The separate database now has a reproducible fictional starter table, strong private credentials, read-only application access, checked local backups and recovery tools. Production NBA schemas/ingestion remain planned, as does everything in the feature table below. The onboarding chart is a student exercise, not an application feature. Backup results are explicitly fictional; API results identify NBA.com as their source.
+Implemented in this starter: a runnable Streamlit navigation shell in [app.py](app.py), a shared local Python environment, PostgreSQL-only Docker Compose setup, a guided Python onboarding script with synthetic backup and a prepared optional NBA API request. The shell has **no completed product profiles or database connection**. Week 1 adds movable Players/Teams wireframe blocks and independently runnable member TODO functions in the shared `src/` application modules. A supplied explicit NBA snapshot command supports local exploration; the app only reads snapshots and never retrieves data on rerender. Practice inputs are clearly fictional. Member calculations/charts remain unfinished until reviewed. The separate database now has a reproducible fictional starter table, strong private credentials, read-only application access, checked local backups and recovery tools. Production NBA schemas/ingestion remain planned, as does everything in the feature table below. The onboarding chart is a student exercise, not an application feature. Week 1 component previews likewise do not establish finished profiles or a production pipeline. Backup results are explicitly fictional; API results identify NBA.com as their source.
 
 ## Navigation and requirements
 
@@ -48,20 +48,27 @@ scripts/database.sql           # fictional starter table; production schemas rem
 scripts/verify_environment.py  # implemented offline verification
 weekly/week0/onboarding.py           # implemented guided script; student TODOs unanswered
 weekly/week0/player_stats_backup.csv # fictional teaching data
-weekly/                        # concise student assignment, index and reusable template
-
-# Planned as later issues, not present yet:
-courtiq/data.py                 # collection, source schema, cleaning, local I/O
-courtiq/analytics.py            # deterministic calculations on supplied tables
-courtiq/charts.py               # Plotly figures from calculated tables
-courtiq/views.py                # Streamlit selection, filters, explanations
-scripts/fetch_data.py           # explicit collection entry point after source review
+weekly/week1/                  # assignment guide and personal brainstorming template
+weekly/                        # assignment index and reusable template
+src/data.py                # snapshot I/O, shared input shapes; Aiden/Ignacio/Andrew TODOs
+src/analytics.py           # deterministic percentile/rating calculations; Sri/Michael TODOs
+src/charts.py              # Plotly figures from supplied tables; Jason/Jack TODOs
+src/views.py               # Streamlit profile display; June/Casey TODOs
+scripts/fetch_data.py          # explicit bounded NBA snapshot collection, outside the UI
+scripts/preview_component.py   # run an app function independently against local/practice input
+scripts/check_starter.py       # offline snapshot/cache checks; not student completion
 data/raw/, interim/, processed/ # ignored local NBA responses and derived tables
 ```
+
+For Week 1, each member owns a named TODO function in a shared application module. Supplied table shapes allow independent previews without calling another unfinished function. Students edit only their function body and a personal brainstorming copy; module imports, shared helpers and page wiring stay PM-owned. Cemal consolidates validated components and handles shared-file merge conflicts. The package now holds the assigned application components; production ingestion and database schemas remain future work.
+
+Week 1 acceptance requires real NBA data exploration, cleanup and preliminary calculations/visuals. Synthetic inputs support development and unusual-case checks only. The existing PostgreSQL teaching table is separate; database ingestion is not required for this week's EDA.
 
 Collection owns endpoint parameters, IDs, units and freshness. Analytics receives tables, documents formulas/cohorts and does not fetch data or render UI. Charts receive analytics outputs and label axes/periods. UI owns navigation, user inputs, empty states and explanatory context; it does not duplicate formulas. Approved calculations from onboarding move to ordinary functions for testing and reuse. Schema naming and database design are later review decisions, not silently fixed by this suggested structure.
 
 ## Feature dependencies and roadmap
+
+**Date inconsistency:** the historical dates below and DELIVERABLES.md's ASCII timeline conflict with its milestone table. They are not current weekly deadlines. The [Week 1 assignment](weekly/week1/week-01-player-team-prototypes.md) sets the Oct 21 design meeting, Oct 24 PR deadline, Oct 25 review target and Oct 26 next-assignment target. Other milestones are not silently rescheduled.
 
 | Milestone | Contribution to application | Gate before moving forward |
 | --- | --- | --- |
