@@ -21,7 +21,7 @@ Copy to `brainstorming_<github-handle>.md`; keep this template unchanged. Short 
 
 - **Issue comment/link recording the team's agreed wireframe:** Unknown
 - **What moves, gets larger, or changes in my block; why:** Kept the reversed y-axis. Ignacio agreed top right reads as best.
-- **Agreed column names and which component will use my result:** Teams -> League Efficiency
+- **Agreed column names and which component will use my result:** No column names were agreed; the meeting focused on project ideas. I used the guide's Ratings columns (`TEAM_ID, TEAM_NAME, OFF_RATING, DEF_RATING, NET_RATING, SEASON`). My chart is used by the Teams page "League efficiency" block.
 - **My new idea is:** Comparison feature, similar to the "Matchup Matrix" in the website linked above, that can analyze how players perform vs each other using advanced per possession defensive data. Useful for highlighting offensive-favored, defender-favored, new, historical, and unique matchups across the league.
 - **Additional data/effort if we adopt that idea:** Find a source for the per possession data. Import this data and create a user-friendly visualization to make the data useful.
 
