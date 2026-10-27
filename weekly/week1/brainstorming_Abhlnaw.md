@@ -9,9 +9,9 @@ My code & checks for #17 are done. These are my design ideas to bring to the tea
 
 - **Comparable tool + direct page URL:** [NBA Stats: Players Traditional](https://www.nba.com/stats/players/traditional). Checked October 26, 2026 as a design reference, not a new data source.
 - **Useful interaction & the question it answers:** The season, season-type & per-mode controls make the comparison context clear. I'd keep that context visible so people know what they're comparing.
-- **One CourtIQ idea:** Put three horizontal percentile bars right below the player's basic stats, one each for points, rebounds & assists. That way someone can get a quick feel for where the player sits without digging through a whole table.
-- **Rough sketch:** Player selector & season at the top, then GP/points/rebounds/assists cards, then the three percentile bars. Put the source & a short explanation underneath.
-- **One visual improvement:** Give every bar the same 0-100 scale & show the actual percentile beside it. Label them directly instead of making people rely on color. If a stat is missing, show N/A instead of an empty bar that looks like zero.
+- **One CourtIQ idea:** Add a "What does this player bring?" summary with points, rebounds & assists per game right next to their percentiles. It gives people the actual production & league context in one place instead of making them jump between sections.
+- **Rough sketch:** Player selector & season at the top, then GP & three rows: stat name, per-game average & percentile. Keep the source & GP >= 20 comparison group visible underneath.
+- **One visual improvement:** Line up the raw numbers & percentiles so they're easy to scan. Keep per-game units & percentile labels explicit. Missing values show N/A, not zero. If we later add bars, they should all use the same 0-100 scale.
 - **Data I need:** `PLAYER_ID, PLAYER_NAME, GP, PTS_PER_GAME, REB_PER_GAME, AST_PER_GAME, SEASON` from the supplied NBA.com/nba_api table. It's 2025-26 Regular Season, with one row per player. The stats are already per-game averages.
 - **Rules behind my result:** Filter to GP >= 20 first, then calculate each stat with `rank(method="average", pct=True) * 100`. Ties get the same average rank. Missing stats stay missing & don't count in that stat's denominator. The input stays unchanged. An empty group still returns the five required columns.
 - **Input -> output -> page:** Player table -> `PLAYER_ID, SEASON, PTS_PCTL, REB_PCTL, AST_PCTL` -> the player league-context section. The page can match those results back to the selected player using ID & season.
@@ -19,11 +19,11 @@ My code & checks for #17 are done. These are my design ideas to bring to the tea
 
 ## Shared plan & my contribution
 
-- **Discussion link / agreed wireframe:** Still pending. I haven't posted these ideas or recorded team feedback yet.
-- **What I'd change in my block & why:** My proposal is to put the bars right after the basic stats so the raw numbers & league context are close together. This still needs team input.
+- **Discussion link / agreed wireframe:** Pending an actual discussion link & team decision. My idea is to compare each stat with its percentile beside it. A later idea is to explore an overall metric like BPM or WS/48 & its percentile, but that needs a source/definition review & PM approval. The three current percentiles alone don't measure overall impact on a team.
+- **What I'd change in my block & why:** Pair each per-game stat with its percentile in the player summary. That keeps production & context together. This still needs team input.
 - **Column names & who uses the result:** The assignment requires `PLAYER_ID, SEASON, PTS_PCTL, REB_PCTL, AST_PCTL`. Cemal handles connecting the reviewed calculation to the player page later.
-- **Where my idea stands:** Proposal for discussion. The calculation is this week's assigned work; the bars are a display idea, not extra UI code I've added or something the team has approved.
-- **Extra data / effort:** No extra dataset is needed for the proposed bars. The page would need to select the right ID/season, render the three values, handle N/A & show the source/cohort note. That UI work would need to be agreed on separately.
+- **Where my idea stands:** Proposal for discussion. The calculation is this week's assigned work; the summary is a display idea, not extra UI code I've added or something the team has approved. BPM/WS/48 is a later investigation idea.
+- **Extra data / effort:** The summary uses the existing player table & percentile output. The page would match ID/season, display the values & handle N/A. An overall metric would need separate source & definition checks; I haven't added or fetched one.
 
 ## Checks & review
 
@@ -33,12 +33,12 @@ My code & checks for #17 are done. These are my design ideas to bring to the tea
 - **Unusual cases:** The supplied practice table passed: ID 103 at GP=19 is excluded & ID 102 at GP=20 stays in. IDs 102/104 tie at about 83.33 for points. ID 104's missing assists stay NaN; ID 102 gets 100 for assists because the missing value doesn't count in that denominator.
 - **Other checks:** Empty input & an empty eligible group return the right columns with zero rows. The original table stays unchanged. Real-data IDs, missing values, percentile bounds & an independent count-based check of the top points rank passed. An AST comparison confirmed the imports & other functions weren't changed.
 - **Environment:** The environment verifier, `python -m pip check` & `python -m compileall -q src` passed. The final real-data preview also passed using the cached snapshot.
-- **Teammate review & one finding:** Still pending. I can exchange screenshots & feedback under the PM's guidance, but I haven't completed that exchange yet. I'll add the person's name, what I checked & one actual finding afterward.
+- **Teammate review & one finding:** Pending. I plan to exchange feedback with alionthebeat or find someone in #questions-help. I'll record who I reviewed & one actual finding once the exchange happens.
 
 ## What's left
 
-- Share the design proposal & record the discussion link/feedback.
-- Review a teammate's work & record a real finding. Get feedback on mine too.
-- Commit the final notes/comment cleanup, push `deliverable1-Abhlnaw` & open the PR into `deliverable1`.
-- Include `Related to #11`, reference #17 & request Cemal's review.
-- Keep downloaded data, generated output & credentials out of the PR. Those stay local.
+- **Done locally:** Assigned calculation, completed TODO cleanup, research/design proposal, real-data run & unusual-case checks.
+- **Pending discussion:** Share the proposal & record the actual discussion link/feedback.
+- **Pending teammate exchange:** Review someone's work, give feedback & record a real finding. Get feedback on mine too.
+- **Submission:** Publish `deliverable1-Abhlnaw` & open the PR into `deliverable1`, with `Related to #11`, a reference to #17 & Cemal requested as reviewer. Discussion/review items above remain pending until actually completed.
+- **Files to submit:** Only `src/analytics.py` & this personal notes file. Downloaded data, generated output & credentials stay local.
