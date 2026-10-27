@@ -1,33 +1,44 @@
-# Week 1 — Brainstorming — Sri Abhinav Thatavarthi
+# Week 1 Brainstorming: Sri Abhinav Thatavarthi
 
-Copy to `brainstorming_<github-handle>.md`; keep this template unchanged. Short bullets are enough: aim for 10–15 minutes of writing across the week. Link this in your component PR. Do not attach downloaded data or generated charts.
+My code & checks for #17 are done. These are my design ideas to bring to the team, not decisions we've already agreed on. I still need to join the discussion & exchange feedback with a teammate.
 
 **Name / GitHub handle:** Sri Abhinav Thatavarthi / Abhlnaw
-**Team number / file + function you are editing / page block:** Team 2 / `src/analytics.py`, `calculate_percentiles()` / player league context. Related to #11; assigned sub-issue #17.
+**Team / function / page block:** Team 2 / `src/analytics.py`, `calculate_percentiles()` / player league context. Related to #11 & assigned sub-issue #17.
 
-## Before Wednesday's meeting
+## Research & my design ideas
 
-- **Comparable tool + direct page URL:** Pending personal research.
-- **Useful interaction/visual and the user question it answers:** Pending personal research.
-- **One improvement or original CourtIQ idea:** Pending; I will write my own design ideas.
-- **My component's rough sketch:** Pending personal design ideas.
-- **One visual improvement:** Pending personal design ideas.
-- **Data I need:** `PLAYER_ID, PLAYER_NAME, GP, PTS_PER_GAME, REB_PER_GAME, AST_PER_GAME, SEASON` from the supplied NBA.com/nba_api player table; 2025-26 Regular Season, one row per player in the season. GP is games played; the three statistics are per-game averages.
-- **Rules behind my result:** Include GP >= 20 before ranking each statistic independently with `rank(method="average", pct=True) * 100`. Ties share their average rank. Missing statistics remain missing and do not count toward that statistic's denominator. Work on a copy; empty cohorts return the same output columns. This is a prototype comparison cohort, not an official NBA qualification rule or a measure of overall player quality.
-- **What my function receives → what it produces → where it belongs on the page:** Supplied player table → `PLAYER_ID, SEASON, PTS_PCTL, REB_PCTL, AST_PCTL` → player league context, with the final display arrangement pending team discussion.
-- **One question or risk for the meeting:** Pending preparation for the design discussion.
+- **Comparable tool + direct page URL:** [NBA Stats: Players Traditional](https://www.nba.com/stats/players/traditional). Checked October 26, 2026 as a design reference, not a new data source.
+- **Useful interaction & the question it answers:** The season, season-type & per-mode controls make the comparison context clear. I'd keep that context visible so people know what they're comparing.
+- **One CourtIQ idea:** Put three horizontal percentile bars right below the player's basic stats, one each for points, rebounds & assists. That way someone can get a quick feel for where the player sits without digging through a whole table.
+- **Rough sketch:** Player selector & season at the top, then GP/points/rebounds/assists cards, then the three percentile bars. Put the source & a short explanation underneath.
+- **One visual improvement:** Give every bar the same 0-100 scale & show the actual percentile beside it. Label them directly instead of making people rely on color. If a stat is missing, show N/A instead of an empty bar that looks like zero.
+- **Data I need:** `PLAYER_ID, PLAYER_NAME, GP, PTS_PER_GAME, REB_PER_GAME, AST_PER_GAME, SEASON` from the supplied NBA.com/nba_api table. It's 2025-26 Regular Season, with one row per player. The stats are already per-game averages.
+- **Rules behind my result:** Filter to GP >= 20 first, then calculate each stat with `rank(method="average", pct=True) * 100`. Ties get the same average rank. Missing stats stay missing & don't count in that stat's denominator. The input stays unchanged. An empty group still returns the five required columns.
+- **Input -> output -> page:** Player table -> `PLAYER_ID, SEASON, PTS_PCTL, REB_PCTL, AST_PCTL` -> the player league-context section. The page can match those results back to the selected player using ID & season.
+- **One question for the discussion:** How do we explain percentiles without making them look like an overall player rating? I'd keep GP >= 20 visible & add a short note that this is our prototype comparison group, not an official NBA qualification rule.
 
-## After the meeting — shared plan, my contribution
+## Shared plan & my contribution
 
-- **Issue comment/link recording the team's agreed wireframe:** Pending; I have not yet contributed to the page-design discussion.
-- **What moves, gets larger, or changes in my block; why:** Pending team discussion.
-- **Agreed column names and which component will use my result:** Assignment contract: `PLAYER_ID, SEASON, PTS_PCTL, REB_PCTL, AST_PCTL`. Cemal connects the reviewed calculation to the player page later; no meeting decision is claimed here.
-- **My new idea is:** Pending personal proposal and team discussion.
-- **Additional data/effort if we adopt that idea:** Pending selection of a design idea.
+- **Discussion link / agreed wireframe:** Still pending. I haven't posted these ideas or recorded team feedback yet.
+- **What I'd change in my block & why:** My proposal is to put the bars right after the basic stats so the raw numbers & league context are close together. This still needs team input.
+- **Column names & who uses the result:** The assignment requires `PLAYER_ID, SEASON, PTS_PCTL, REB_PCTL, AST_PCTL`. Cemal handles connecting the reviewed calculation to the player page later.
+- **Where my idea stands:** Proposal for discussion. The calculation is this week's assigned work; the bars are a display idea, not extra UI code I've added or something the team has approved.
+- **Extra data / effort:** No extra dataset is needed for the proposed bars. The page would need to select the right ID/season, render the three values, handle N/A & show the source/cohort note. That UI work would need to be agreed on separately.
 
-## Before my PR is reviewed
+## Checks & review
 
-- **Real-data command/result and one descriptive observation:** `python -m scripts.fetch_data players` saved a validated NBA snapshot retrieved at `2026-10-23T09:20:30.930698+00:00`; its final success message hit a Windows console UnicodeEncodeError. No second request was made. With UTF-8 console output, `python -m scripts.preview_component player-percentiles` succeeded: 582 source rows, 452 eligible players, five required output columns. In this snapshot Luka Doncic (PLAYER_ID 1629029) has 33.5 points/game in 64 games and a points percentile of 100; Shai Gilgeous-Alexander has 31.1 points/game and approximately 99.78. These describe this cohort, not causes or overall player quality.
-- **Unusual case checked** (e.g. missing value or empty table) **and expected/actual result:** Supplied practice preview and assertions passed: ID 103 (GP=19) excluded; ID 102 (GP=20) included; IDs 102/104 share points percentile 83.3333; ID 104's missing assists stay NaN. ID 102's assists percentile is 100 because the missing statistic is excluded from its denominator. Empty input and an empty eligible cohort return zero rows with the exact five columns; the source frame remains unchanged. Environment verifier, pip check and `python -m compileall -q src` passed.
-- **Teammate/component I reviewed; did its result fit what the next component needs? One finding:** Pending; no teammate PR reviewed yet.
-- **Remaining blocker or connection needed next week:** Complete comparable-tool research, contribute to the design discussion, and review a teammate before claiming full assignment completion. Final page integration remains Cemal's work. PR target is `deliverable1` and reviewer is Cemal per task card, overriding stale assignment branch/reviewer text.
+- **Real-data run:** `python -m scripts.fetch_data players` saved the NBA snapshot at `2026-10-23T09:20:30.930698+00:00`. The final print hit a Windows UnicodeEncodeError, but the saved snapshot validated fine. The preview reused it with UTF-8 console output, with no second NBA request.
+- **Preview command & result:** `python -m scripts.preview_component player-percentiles` passed. There were 582 source rows & 452 players with GP >= 20. The output has the exact five required columns.
+- **One observation:** In this snapshot, Luka Doncic has 33.5 points/game over 64 games & a points percentile of 100. Shai Gilgeous-Alexander has 31.1 points/game & about 99.78. That's their scoring position in this group, not a claim about who's the better overall player.
+- **Unusual cases:** The supplied practice table passed: ID 103 at GP=19 is excluded & ID 102 at GP=20 stays in. IDs 102/104 tie at about 83.33 for points. ID 104's missing assists stay NaN; ID 102 gets 100 for assists because the missing value doesn't count in that denominator.
+- **Other checks:** Empty input & an empty eligible group return the right columns with zero rows. The original table stays unchanged. Real-data IDs, missing values, percentile bounds & an independent count-based check of the top points rank passed. An AST comparison confirmed the imports & other functions weren't changed.
+- **Environment:** The environment verifier, `python -m pip check` & `python -m compileall -q src` passed. The final real-data preview also passed using the cached snapshot.
+- **Teammate review & one finding:** Still pending. I can exchange screenshots & feedback under the PM's guidance, but I haven't completed that exchange yet. I'll add the person's name, what I checked & one actual finding afterward.
+
+## What's left
+
+- Share the design proposal & record the discussion link/feedback.
+- Review a teammate's work & record a real finding. Get feedback on mine too.
+- Commit the final notes/comment cleanup, push `deliverable1-Abhlnaw` & open the PR into `deliverable1`.
+- Include `Related to #11`, reference #17 & request Cemal's review.
+- Keep downloaded data, generated output & credentials out of the PR. Those stay local.
