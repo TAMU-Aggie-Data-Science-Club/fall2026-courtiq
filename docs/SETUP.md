@@ -6,6 +6,8 @@ Use this guide from your **member worktree root**, the folder containing `requir
 
 For Week 0, complete sections 1–5 and check `python scripts/database.py status`. Sections 6–7 are reference for the app preview and later maintenance. Setup already creates a backup; manually restoring a database is not part of the assignment.
 
+For [Week 1](../weekly/week1/week-01-player-team-prototypes.md), use section 1 in your new worktree, then follow that assignment's real NBA snapshot commands. Docker/PostgreSQL is not needed for Week 1 previews; do not replace another checkout's database credentials.
+
 ## 1. Local Python environment
 
 Install [Python 3.12](https://www.python.org/downloads/) and [Git](https://git-scm.com/downloads/). On Windows, enable the Python launcher (`py`) and PATH options, then reopen the terminal.
@@ -148,7 +150,7 @@ With `.venv` active:
 python -m streamlit run app.py
 ```
 
-Open `http://localhost:8501` to inspect Players, Teams, Compare and Trends. The shell still shows planned placeholders and is not connected to PostgreSQL. Stop Streamlit with Ctrl+C. Docker is only needed for the separate database setup check at this milestone.
+Open `http://localhost:8501` to inspect Players, Teams, Compare and Trends. Players/Teams have Week 1 placeholder blocks and component previews; use **Development settings** to choose practice inputs or your local real NBA snapshots. Member functions remain unfinished in the starter. The app is not connected to PostgreSQL. Stop Streamlit with Ctrl+C. Docker is only needed for the separate database setup check.
 
 ## 7. Backups and recovery
 

@@ -41,6 +41,7 @@ If any of these files are missing or clearly out of date for what the user is do
 - **Small, focused changes.** Do the smallest thing that satisfies the task. Don't add scope, abstraction, features, or ceremony that wasn't asked for.
 - **Broad reads, narrow writes.** Read whatever you need to understand the repo. Only change what the task requires.
 - **Match the repo's conventions.** Mirror existing style, naming, and structure. If a convention isn't established, propose one and let the user confirm.
+- **Member privacy.** Identify contributors by name and team. Do not include assessments or rankings of individual ability in repository content, assignments, code comments, or review instructions. Keep teaching and support guidance neutral.
 - **Keep the user oriented.** Say what you're about to do, do it, then say what changed — briefly. Don't narrate the workflow at the user.
 - **Follow instructions verbatim.** If the user gives an explicit direction that conflicts with a default here, follow the user.
 
