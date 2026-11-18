@@ -9,16 +9,12 @@ from src.data import METRICS
 # Owner: Sri Abhinav Thatavarthi — edit only this function body.
 def calculate_percentiles(frame):
     """Return PLAYER_ID, SEASON, PTS_PCTL, REB_PCTL, AST_PCTL for GP >= 20."""
-    # TODO(Sri) 1: Filter GP >= 20 into a copy. This classroom cohort is not an official rule.
-    # TODO 2: For each metric, use rank(method="average", pct=True) * 100.
-    # Missing values stay missing; pandas excludes them from that metric's denominator.
-    # Example: pd.Series([10, 10, 30]).rank(method="average", pct=True) * 100
-    # gives [50, 50, 100]. It is a relative rank, not "50% as good".
-    # TODO 3: Return the five named columns; check GP=19/20, ties and missing values.
-    # Use the one supplied practice table: ID 103 is excluded, PTS_PCTL for ID 102
-    # is about 83.33, and AST_PCTL for ID 104 stays missing. No extra fixture needed.
-    # Empty input returns an empty DataFrame with those same columns.
-    return None
+    # prototype cohort != official NBA qualification rule.
+    eligible = frame.loc[frame["GP"] >= 20].copy()
+    # Ties share average ranks; missing values stay missing & are excluded per metric.
+    for metric, percentile in zip(METRICS, ["PTS_PCTL", "REB_PCTL", "AST_PCTL"]):
+        eligible[percentile] = eligible[metric].rank(method="average", pct=True) * 100
+    return eligible[["PLAYER_ID", "SEASON", "PTS_PCTL", "REB_PCTL", "AST_PCTL"]]
 
 
 # Owner: Michael Du — edit only this function body.
