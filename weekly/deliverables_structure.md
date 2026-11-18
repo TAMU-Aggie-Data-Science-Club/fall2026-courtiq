@@ -2,7 +2,7 @@
 
 This is the shared guide for creating assignments, dividing responsibilities and reviewing submissions. [DELIVERABLES.md](../DELIVERABLES.md) remains the semester roadmap; [ARCHITECTURE.md](../ARCHITECTURE.md) defines product requirements. **GitHub Issues are authoritative for actual owners, deadlines, status and approved changes.** Week 0 is an approved exception: Discord holds the deadline/updates and individual PRs into `deliverable0` record submissions and review. No Issue is required; the PM can link PRs to an Issue later. This document describes the process and proposed specialties, not a separate task tracker.
 
-New to GitHub? Use [the beginner walkthrough](../CONTRIBUTING.md#new-to-github): [PM Issue creation](../CONTRIBUTING.md#create-an-issue-pms), [member Issue use](../CONTRIBUTING.md#use-an-issue-members) and [PR submission](../CONTRIBUTING.md#open-a-pull-request-members).
+New to GitHub? Use [the GitHub walkthrough](../CONTRIBUTING.md#new-to-github): [PM Issue creation](../CONTRIBUTING.md#create-an-issue-pms), [member Issue use](../CONTRIBUTING.md#use-an-issue-members) and [PR submission](../CONTRIBUTING.md#open-a-pull-request-members).
 
 ## How a deliverable is created
 
@@ -12,53 +12,39 @@ The steps below apply to future Issue-based deliverables. For Week 0, publish th
 2. Open the GitHub Issue with the goal, deadline, prerequisites, member/team assignments, file/output expectations, dependencies and a concrete acceptance checklist. Identify whether submission is individual or coordinated team work.
 3. Prepare `issue-<n>/integration` using the established [contribution workflow](../CONTRIBUTING.md). Make the starter and any approved supporting files available there before members create feature branches.
 4. Copy [assignment-template.md](assignment-template.md) into `weekly/weekN/`, add only the instructions and assets needed that week, and link its actual Issue. Update the [weekly index](README.md). Do not create future assignments before they are approved.
-5. Give each member an explicit slice and reviewer in the Issue. For team work, agree on shared inputs/outputs and avoid assigning the same file to two people simultaneously. If requirements change, record the decision in the Issue and update the instructions.
+5. Give each member an explicit slice and reviewer in the Issue. For team work, agree on shared inputs/outputs and assign disjoint function bodies when members share a module, keeping shared imports/helpers PM-owned. If requirements change, record the decision in the Issue and update the instructions.
 
 Each assignment should answer: **Who does what? What must it produce? What depends on it? How will it be checked? Where does the PR go?** Update the semester roadmap only when its milestones change; keep everyday task updates in Issues.
 
-## Proposed teams — specialization when the time comes
+## Numbered teams and assignment ownership
+
+Team numbers identify groups, not permanent specialties. Weekly Issues assign actual tasks; starter examples and support are available to everyone. Members propose ideas together and own clearly marked functions in the shared application modules. Names and TODO comments identify each member's section; Cemal handles integration conflicts. The [Week 1 guide](week1/week-01-player-team-prototypes.md) defines the current allocation.
 
 ### Leadership
 
-**Cemal Duman — U4 — Co-PM.** Work with the PM to prepare clear Issues, confirm prerequisites, coordinate reviews, check acceptance evidence and bring blockers/scope decisions to the PMs. PMs own the final integration-to-`main` review and merge decision.
+**Ali — PM. Cemal Duman — U4 — Co-PM.** Prepare assignments, coordinate reviews, verify acceptance and support blocked members. For Week 1, Cemal handles feature merges, cross-PR conflicts and integration; members submit PRs, review peers and fix their own code. PMs own final integration-to-`main` review and merge decisions. No Technical Lead is appointed by this guide.
 
-The roster below replaces earlier proposed member groupings. Suggested focus describes how members can contribute once specialization starts; actual weekly tasks are assigned in GitHub Issues. Experience levels guide support, not grading or permission to participate. Teams remain together and can rotate technical responsibilities as needed.
+### Team 1
 
-### Team A — Data and Architecture
+- Aiden Jackson
+- Ignacio Wijatno
+- Andrew Mok
 
-| Member | Year | Experience | Suggested focus when assigned |
-| --- | --- | --- | --- |
-| Aiden Jackson | U3 | Advanced | Coordinate data collection/validation slices and help teammates debug |
-| Ignacio Wijatno | U2 | Beginner | Implement a small approved fetch/cleaning task with guidance |
-| Andrew Mok | U4 | Novice | Implement an assigned data-organization or schema slice with review |
+### Team 2
 
-**Team requirements when the relevant Issue is approved:** collect player/team/game data from approved sources; keep IDs, seasons and units consistent; clean and validate tables; document fields and provenance in the appropriate project files; keep downloads/caches under ignored `data/`. Handle request failures and avoid unnecessary repeated requests. Implement the planned PostgreSQL work only when it is explicitly assigned—Week 0 requires the PostgreSQL environment check, but no schema or ingestion implementation.
+- June Hwang
+- Jason Q. Koffi
+- Sri Abhinav Thatavarthi
 
-**Handoff:** provide reproducible loading/cleaning code and agreed tables to Teams B/C. Confirm data definitions with Team C before committing to a schema. This supports the data-foundation and integration milestones.
+### Team 3
 
-### Team B — Application and Visualization
+- Michael Du
+- Casey Hawkings
+- Jack Dunlap
 
-| Member | Year | Experience | Suggested focus when assigned |
-| --- | --- | --- | --- |
-| June Hwang | U1 | Intermediate | Coordinate page layouts and chart integration; support teammates |
-| Jack Dunlap | U2 | Beginner–Intermediate | Implement an assigned interaction, filter or page slice |
-| Jason Q. Koffi | U1 | Beginner | Implement a small page/chart component and empty-state handling with guidance |
+### Shared boundaries
 
-**Team requirements when the relevant Issue is approved:** implement Streamlit interactions and Plotly views for Players, Teams, Compare and Trends, following the assigned scope in ARCHITECTURE. Label metrics, periods and sources clearly; handle missing/stale data; reuse validated analytics rather than duplicate formulas in the UI. Keep the app runnable as reviewed slices are integrated.
-
-**Handoff:** consume Team A's agreed data and Team C's calculations, then provide an interactive view with execution evidence. This supports the profile, comparison/trend and integration milestones.
-
-### Team C — Statistics and Analytics
-
-| Member | Year | Experience | Suggested focus when assigned |
-| --- | --- | --- | --- |
-| Michael Du | U4 | Advanced | Coordinate formulas and validation; help teammates reason about results |
-| Casey Hawkings | U4 | Intermediate | Implement assigned comparison or recent-performance calculations |
-| Sri Abhinav Thatavarthi | U1 | Beginner | Implement a small metric/filter/checking task with guidance |
-
-**Team requirements when the relevant Issue is approved:** implement documented player/team metrics, fair comparisons, league percentiles and recent-performance calculations. Define eligibility, normalization, periods and missing-data handling; distinguish totals from averages; validate important calculations independently. Trend explanations must not turn ordinary variation into unsupported claims. Forecasting/ML remains stretch work requiring approval.
-
-**Handoff:** provide reusable calculations and clear definitions to Team B; agree on required inputs with Team A. This supports the profile, comparison and trend milestones.
+Collect only from approved sources; preserve IDs, units, periods and provenance; keep datasets under ignored `data/`. Collection, calculations, charts and UI have separate responsibilities per ARCHITECTURE. Shared inputs/outputs allow independent development; assignments identify who consumes each result. Database/schema work requires an explicit task. ML stays stretch work. Week 1's shared examples are development aids, not actual NBA results.
 
 ## What each member is assigned for Week 0
 
@@ -92,10 +78,10 @@ If something is incomplete, request specific changes and recheck the affected be
 
 ## How work is submitted
 
-- **Individual work:** each member uses `issue-<n>/<member-slice>` and unique filenames specified by the assignment. Week 0 uses `deliverable0-<github-handle>` and one member script, with the PR targeting `deliverable0`.
-- **Team work:** split the Issue into small member-owned feature slices. Each slice has its own feature branch/PR into the same Issue integration branch. Name the contributor(s), handoff and reviewer in the Issue/PR; do not hide all work in one indistinguishable submission. A pair-owned slice is acceptable when explicitly assigned.
+- **Individual work:** each member uses `issue-<n>/<member-slice>` and the function/file slice specified by the assignment. Week 1 uses named TODO functions in shared `src/` modules; only the personal brainstorming document has an individual filename. Week 0 uses `deliverable0-<github-handle>` and one member script, with the PR targeting `deliverable0`.
+- **Team work:** split the Issue into small member-owned feature slices. Each slice has its own feature branch/PR into the same Issue integration branch. A slice can be one named function in a shared app module; members change only their own section. Name the contributor(s), handoff and reviewer in the Issue/PR; do not hide all work in one indistinguishable submission. A pair-owned slice is acceptable when explicitly assigned.
 - **PR contents:** explain what changed, link the Issue when one exists, give the relevant verification commands and briefly summarize their results. Week 0 requires no screenshots or attachments. Stage only the assigned source files; generated chart/data outputs stay local.
 - **Shared Issues:** use `Related to #<n>` so one member's submission does not close the whole team assignment. Reserve closing the Issue for completion of all required slices and the PM's final review.
-- **Review and merge:** request a teammate/Co-PM review, address any configured automated-review feedback, and merge feature → integration only after approval. PMs review integration → `main` when all required work is collected and verified. For Week 0, `deliverable0` is that shared integration branch.
+- **Review and merge:** request a teammate/Co-PM review and address any configured automated-review feedback. Typically, Cemal performs feature → integration merges and handles cross-PR conflicts; members do not merge or rebase branches. Other assignments follow their approved merge ownership. PMs review integration → `main` when all required work is collected and verified. For Week 0, `deliverable0` is that shared integration branch.
 
 For future tasks the actual Issue number is supplied by the PM; `<n>` is a placeholder. Week 0 needs no Issue number; members share PR links and blockers in Discord. Follow CONTRIBUTING for worktree, synchronization, commit/push and cleanup commands. Members submit PRs; they do not push directly to `main`.

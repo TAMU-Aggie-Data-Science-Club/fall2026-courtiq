@@ -10,6 +10,8 @@ This guide explains how the Aggie Data Science Club team uses GitHub, including 
 
 **First assignment:** follow [Week 00](weekly/week0/week-00-onboarding.md). Week 0 is the PM-approved exception to the Issue requirement: each member submits their own Python script through a feature PR into `deliverable0`, with deadline/help in Discord. Future work follows the Issue-based workflow below.
 
+**Week 1:** follow [NBA data and visual prototypes](weekly/week1/week-01-player-team-prototypes.md). Members submit their named TODO function in a shared app module plus a personal brainstorming document; Cemal coordinates reviews and performs feature-to-integration merges/conflict resolution. This assignment-specific ownership overrides member merge/cleanup steps below; PMs retain final review into `main`.
+
 ---
 
 ## Table of Contents
@@ -126,6 +128,8 @@ This is the workflow for publishing project changes. Week 0 follows the same rev
 ---
 
 ## Staying in sync
+
+**Week 1:** start from the PM-published `issue-11/integration` branch using the assignment's worktree commands. Cemal handles branch synchronization and merge conflicts; members keep working on their feature branches. The general `main`/rebase guidance below does not override that assignment.
 
 **This is the most common source of pain, so do it reflexively.** GitHub is the source of truth, not your laptop. Before you start any work — and regularly while you work — pull the latest:
 
