@@ -20,7 +20,7 @@ def main():
             continue
         package, expected = line.split("==")
         try:
-            importlib.import_module(package)
+            importlib.import_module({"scikit-learn": "sklearn"}.get(package, package))
             actual = importlib.metadata.version(package)
             print(f"{package}: {actual}")
             if actual != expected:
