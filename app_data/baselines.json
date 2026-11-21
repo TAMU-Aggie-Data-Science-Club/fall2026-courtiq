@@ -1,0 +1,109 @@
+{
+  "team": [
+    {
+      "model": "home_rate",
+      "log_loss": 0.6877688060560511,
+      "brier": 0.24731180420887514,
+      "accuracy": 0.5544715447154471,
+      "roc_auc": 0.5,
+      "pr_auc": 0.5544715447154471
+    },
+    {
+      "model": "elo",
+      "log_loss": 0.6079548184150672,
+      "brier": 0.20958687991358174,
+      "accuracy": 0.6780487804878049,
+      "roc_auc": 0.7259509386304771,
+      "pr_auc": 0.7425805469921679
+    }
+  ],
+  "player": [
+    {
+      "target": "points",
+      "n": 26648,
+      "fallback": "training mean when no prior season games",
+      "mae": 4.718593394233923,
+      "rmse": 6.226281864720564,
+      "bias": -0.12428208881417305
+    },
+    {
+      "target": "rebounds",
+      "n": 26648,
+      "fallback": "training mean when no prior season games",
+      "mae": 1.94978308390633,
+      "rmse": 2.5847989457550136,
+      "bias": -0.03469602737331316
+    },
+    {
+      "target": "assists",
+      "n": 26648,
+      "fallback": "training mean when no prior season games",
+      "mae": 1.3783208247042902,
+      "rmse": 1.8899013846504125,
+      "bias": -0.03687302655501001
+    }
+  ],
+  "breakout": {
+    "precision_at_15": 0.13333333333333333,
+    "base_rate": 0.05181347150259067,
+    "baseline": {
+      "log_loss": 1.2169111683175098,
+      "brier": 0.08808290155440414,
+      "accuracy": 0.9119170984455959,
+      "roc_auc": 0.4808743169398907,
+      "pr_auc": 0.05181347150259067
+    },
+    "cohorts": [
+      {
+        "outcome_season": 2016,
+        "candidates": 192,
+        "base_rate": 0.03125
+      },
+      {
+        "outcome_season": 2017,
+        "candidates": 181,
+        "base_rate": 0.0718232044198895
+      },
+      {
+        "outcome_season": 2018,
+        "candidates": 188,
+        "base_rate": 0.0425531914893617
+      },
+      {
+        "outcome_season": 2019,
+        "candidates": 190,
+        "base_rate": 0.06842105263157895
+      },
+      {
+        "outcome_season": 2020,
+        "candidates": 196,
+        "base_rate": 0.03571428571428571
+      },
+      {
+        "outcome_season": 2021,
+        "candidates": 206,
+        "base_rate": 0.02912621359223301
+      },
+      {
+        "outcome_season": 2022,
+        "candidates": 189,
+        "base_rate": 0.015873015873015872
+      },
+      {
+        "outcome_season": 2023,
+        "candidates": 182,
+        "base_rate": 0.03296703296703297
+      },
+      {
+        "outcome_season": 2024,
+        "candidates": 193,
+        "base_rate": 0.05699481865284974
+      },
+      {
+        "outcome_season": 2025,
+        "candidates": 193,
+        "base_rate": 0.05181347150259067
+      }
+    ]
+  }
+}

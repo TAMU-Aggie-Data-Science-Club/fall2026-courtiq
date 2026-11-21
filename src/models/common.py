@@ -34,9 +34,12 @@ def metrics(y,p,classification=False):
 
 
 def save(name, payload):
+    import platform
+    import sklearn
     ARTIFACTS.mkdir(exist_ok=True)
     payload["created_at"]=datetime.now(timezone.utc).isoformat()
     payload["dataset_version"]=json.loads((APP/"manifest.json").read_text())["version"]
+    payload["packages"]={"python":platform.python_version(),"scikit-learn":sklearn.__version__,"pandas":pd.__version__,"numpy":np.__version__}
     with (ARTIFACTS/f"{name}.pkl").open("wb") as stream: pickle.dump(payload,stream)
 
 

@@ -1,0 +1,10 @@
+{
+  "n": 1230,
+  "line_timing": "Unknown; retrospective evaluation only",
+  "pushes": 10,
+  "cover_accuracy_excluding_pushes": 0.48360655737704916,
+  "three_class_brier": 0.5372479265410045,
+  "interval_80_coverage": 0.775609756097561,
+  "moneyline_games": 0,
+  "market_win_metrics": "Unavailable: no matched two-sided moneyline quotes in test season"
+}

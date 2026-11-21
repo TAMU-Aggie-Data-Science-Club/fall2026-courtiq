@@ -1,0 +1,400 @@
+{
+  "team_home_win": {
+    "selected": "linear",
+    "training_cutoff": "2023-04-09 00:00:00",
+    "inference_available_after": "2025-04-13 00:00:00",
+    "split_counts": {
+      "train": 9519,
+      "validation": 1230,
+      "calibration": 1224,
+      "test": 1230
+    },
+    "results": [
+      {
+        "model": "linear",
+        "period": "validation",
+        "n": 1230,
+        "log_loss": 0.6100841701319969,
+        "brier": 0.21169053504974206,
+        "accuracy": 0.651219512195122,
+        "roc_auc": 0.7211786391629553,
+        "pr_auc": 0.7540097154372593
+      },
+      {
+        "model": "tree",
+        "period": "validation",
+        "n": 1230,
+        "log_loss": 0.6239941439756795,
+        "brier": 0.21771855322800376,
+        "accuracy": 0.6373983739837399,
+        "roc_auc": 0.702213011699022,
+        "pr_auc": 0.7381132816784427
+      },
+      {
+        "model": "linear",
+        "period": "calibration",
+        "n": 1224,
+        "log_loss": 0.6130808511408813,
+        "brier": 0.21250438631382843,
+        "accuracy": 0.6633986928104575,
+        "roc_auc": 0.7205996318899544,
+        "pr_auc": 0.7429253352636904
+      },
+      {
+        "model": "linear",
+        "period": "test",
+        "n": 1230,
+        "log_loss": 0.6043887257021854,
+        "brier": 0.20791022673925866,
+        "accuracy": 0.675609756097561,
+        "roc_auc": 0.7299189802427382,
+        "pr_auc": 0.7427145180465318
+      }
+    ],
+    "calibration": [
+      {
+        "bucket": "(-0.001, 0.2]",
+        "n": 27,
+        "predicted": 0.15566220124483612,
+        "actual": 0.037037037037037035
+      },
+      {
+        "bucket": "(0.2, 0.4]",
+        "n": 239,
+        "predicted": 0.3157536316048583,
+        "actual": 0.28870292887029286
+      },
+      {
+        "bucket": "(0.4, 0.6]",
+        "n": 379,
+        "predicted": 0.5036114860591799,
+        "actual": 0.46701846965699206
+      },
+      {
+        "bucket": "(0.6, 0.8]",
+        "n": 449,
+        "predicted": 0.6976476611095307,
+        "actual": 0.7238307349665924
+      },
+      {
+        "bucket": "(0.8, 1.0]",
+        "n": 136,
+        "predicted": 0.857533555932729,
+        "actual": 0.8088235294117647
+      }
+    ]
+  },
+  "team_margin": {
+    "selected": "linear",
+    "training_cutoff": "2023-04-09 00:00:00",
+    "inference_available_after": "2025-04-13 00:00:00",
+    "split_counts": {
+      "train": 9519,
+      "validation": 1230,
+      "calibration": 1224,
+      "test": 1230
+    },
+    "results": [
+      {
+        "model": "linear",
+        "period": "validation",
+        "n": 1230,
+        "mae": 11.075865201803694,
+        "rmse": 14.174874421386331,
+        "bias": -0.07299002288833167
+      },
+      {
+        "model": "tree",
+        "period": "validation",
+        "n": 1230,
+        "mae": 11.116764023510097,
+        "rmse": 14.276842985140316,
+        "bias": -0.09796140540928325
+      },
+      {
+        "model": "linear",
+        "period": "calibration",
+        "n": 1224,
+        "mae": 11.05201952537812,
+        "rmse": 14.173171588280082,
+        "bias": 0.6560321029654008
+      },
+      {
+        "model": "linear",
+        "period": "test",
+        "n": 1230,
+        "mae": 11.388084250115476,
+        "rmse": 14.613703063441488,
+        "bias": 0.5261112265376062
+      }
+    ],
+    "calibration": {
+      "prediction_interval_80_coverage": 0.775609756097561
+    }
+  },
+  "team_total": {
+    "selected": "linear",
+    "training_cutoff": "2023-04-09 00:00:00",
+    "inference_available_after": "2025-04-13 00:00:00",
+    "split_counts": {
+      "train": 9519,
+      "validation": 1230,
+      "calibration": 1224,
+      "test": 1230
+    },
+    "results": [
+      {
+        "model": "linear",
+        "period": "validation",
+        "n": 1230,
+        "mae": 14.724620460902928,
+        "rmse": 18.363554088672835,
+        "bias": 0.4069896141013426
+      },
+      {
+        "model": "tree",
+        "period": "validation",
+        "n": 1230,
+        "mae": 14.989132622627803,
+        "rmse": 18.69094722745717,
+        "bias": -0.09712665836111303
+      },
+      {
+        "model": "linear",
+        "period": "calibration",
+        "n": 1224,
+        "mae": 14.861905410319006,
+        "rmse": 18.517033404893315,
+        "bias": -0.072634587874874
+      },
+      {
+        "model": "linear",
+        "period": "test",
+        "n": 1230,
+        "mae": 15.440371088816784,
+        "rmse": 19.351283144447855,
+        "bias": 0.504430548685692
+      }
+    ],
+    "calibration": {
+      "prediction_interval_80_coverage": 0.7886178861788617
+    }
+  },
+  "player_points": {
+    "selected": "tree",
+    "training_cutoff": "2023-04-09 00:00:00",
+    "inference_available_after": "2025-04-13 00:00:00",
+    "split_counts": {
+      "train": 200159,
+      "validation": 26095,
+      "calibration": 26178,
+      "test": 26648
+    },
+    "results": [
+      {
+        "model": "linear",
+        "period": "validation",
+        "n": 26095,
+        "mae": 4.646419438955401,
+        "rmse": 6.047937867650446,
+        "bias": 0.20103058422774767
+      },
+      {
+        "model": "tree",
+        "period": "validation",
+        "n": 26095,
+        "mae": 4.621268444339007,
+        "rmse": 6.016023478642551,
+        "bias": 0.16755157238102153
+      },
+      {
+        "model": "tree",
+        "period": "calibration",
+        "n": 26178,
+        "mae": 4.675490372021097,
+        "rmse": 6.077268993083571,
+        "bias": 0.06578232048665646
+      },
+      {
+        "model": "tree",
+        "period": "test",
+        "n": 26648,
+        "mae": 4.649501234468673,
+        "rmse": 6.057018988821373,
+        "bias": 0.1665400449412013
+      }
+    ],
+    "calibration": {
+      "prediction_interval_80_coverage": 0.802574302011408
+    }
+  },
+  "player_rebounds": {
+    "selected": "tree",
+    "training_cutoff": "2023-04-09 00:00:00",
+    "inference_available_after": "2025-04-13 00:00:00",
+    "split_counts": {
+      "train": 200159,
+      "validation": 26095,
+      "calibration": 26178,
+      "test": 26648
+    },
+    "results": [
+      {
+        "model": "linear",
+        "period": "validation",
+        "n": 26095,
+        "mae": 1.924537555538947,
+        "rmse": 2.532208493486068,
+        "bias": 0.041705201641313305
+      },
+      {
+        "model": "tree",
+        "period": "validation",
+        "n": 26095,
+        "mae": 1.9101465271024616,
+        "rmse": 2.518546871177658,
+        "bias": 0.01926713773629506
+      },
+      {
+        "model": "tree",
+        "period": "calibration",
+        "n": 26178,
+        "mae": 1.9430660889047464,
+        "rmse": 2.5531986063452354,
+        "bias": -0.013856544982802678
+      },
+      {
+        "model": "tree",
+        "period": "test",
+        "n": 26648,
+        "mae": 1.9163006948186365,
+        "rmse": 2.5136112783626468,
+        "bias": 0.020323729554206468
+      }
+    ],
+    "calibration": {
+      "prediction_interval_80_coverage": 0.8022365655959172
+    }
+  },
+  "player_assists": {
+    "selected": "tree",
+    "training_cutoff": "2023-04-09 00:00:00",
+    "inference_available_after": "2025-04-13 00:00:00",
+    "split_counts": {
+      "train": 200159,
+      "validation": 26095,
+      "calibration": 26178,
+      "test": 26648
+    },
+    "results": [
+      {
+        "model": "linear",
+        "period": "validation",
+        "n": 26095,
+        "mae": 1.3701358001820934,
+        "rmse": 1.8517923904970721,
+        "bias": 0.021972343279488212
+      },
+      {
+        "model": "tree",
+        "period": "validation",
+        "n": 26095,
+        "mae": 1.3625554609357005,
+        "rmse": 1.8466940432148347,
+        "bias": -0.0020472526057501357
+      },
+      {
+        "model": "tree",
+        "period": "calibration",
+        "n": 26178,
+        "mae": 1.348320208482515,
+        "rmse": 1.833806671812432,
+        "bias": -0.010655038732231907
+      },
+      {
+        "model": "tree",
+        "period": "test",
+        "n": 26648,
+        "mae": 1.35888368007255,
+        "rmse": 1.8424743062801854,
+        "bias": 0.0188638367573116
+      }
+    ],
+    "calibration": {
+      "prediction_interval_80_coverage": 0.7981837286100271
+    }
+  },
+  "breakout_breakout": {
+    "selected": "tree",
+    "training_cutoff": "2022-07-01",
+    "inference_available_after": "2025-07-01",
+    "split_counts": {
+      "train": 1342,
+      "validation": 182,
+      "calibration": 193,
+      "test": 193
+    },
+    "results": [
+      {
+        "model": "linear",
+        "period": "validation",
+        "n": 182,
+        "log_loss": 0.5817124466847128,
+        "brier": 0.20084198504883422,
+        "accuracy": 0.6813186813186813,
+        "roc_auc": 0.8428030303030303,
+        "pr_auc": 0.11073806528752667
+      },
+      {
+        "model": "tree",
+        "period": "validation",
+        "n": 182,
+        "log_loss": 0.11701167321673457,
+        "brier": 0.029893264612457792,
+        "accuracy": 0.967032967032967,
+        "roc_auc": 0.8664772727272727,
+        "pr_auc": 0.22106481481481483
+      },
+      {
+        "model": "tree",
+        "period": "calibration",
+        "n": 193,
+        "log_loss": 0.24987084027063508,
+        "brier": 0.053935578165579125,
+        "accuracy": 0.9430051813471503,
+        "roc_auc": 0.7617382617382618,
+        "pr_auc": 0.15717820624720952
+      },
+      {
+        "model": "tree",
+        "period": "test",
+        "n": 193,
+        "log_loss": 0.21855816744376566,
+        "brier": 0.050470150336341946,
+        "accuracy": 0.9481865284974094,
+        "roc_auc": 0.7967213114754098,
+        "pr_auc": 0.14277896133786735
+      }
+    ],
+    "calibration": [
+      {
+        "bucket": "(-0.001, 0.2]",
+        "n": 185,
+        "predicted": 0.014615571147487273,
+        "actual": 0.043243243243243246
+      },
+      {
+        "bucket": "(0.2, 0.4]",
+        "n": 6,
+        "predicted": 0.313423124161192,
+        "actual": 0.3333333333333333
+      },
+      {
+        "bucket": "(0.4, 0.6]",
+        "n": 2,
+        "predicted": 0.4129023750342878,
+        "actual": 0.0
+      }
+    ]
+  }
+}
