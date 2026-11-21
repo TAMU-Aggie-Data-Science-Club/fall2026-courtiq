@@ -1,5 +1,7 @@
 # CourtIQ development setup
 
+**Current CSV presentation app:** follow [DEMO.md](DEMO.md) for installation, build, training, validation and launch. Docker/PostgreSQL steps below are retained for the historical onboarding exercise and are not required for the CSV application. Current runtime reads `app_data/` and trusted model artifacts only; raw Kaggle files are needed for rebuilding, not page navigation.
+
 Use this guide from your **member worktree root**, the folder containing `requirements.txt` and `compose.yaml`. [Week 0](../weekly/week0/week-00-onboarding.md#1-get-the-project-and-your-branch) explains how to get that worktree. Run commands one at a time in PowerShell on Windows or Terminal on macOS/Linux.
 
 **Python scripts and Streamlit run locally in one `.venv`. Docker runs only PostgreSQL.** Jupyter, if used later, also stays in the local Python environment; this assignment uses a regular script and does not require Jupyter. The supplied database setup creates a small fictional teaching table and manages backups. Week 0 members verify it; they do not implement schemas, ingestion or an app/database connection.

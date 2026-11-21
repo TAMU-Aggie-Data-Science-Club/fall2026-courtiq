@@ -2,6 +2,29 @@
 
 *ADSC Catalyst Project · Fall 2026*
 
+## Current presentation build: CSV application
+
+The November implementation follows the unified PDF specification and supersedes the older API/database roadmap below. Five tools share one app: Player Scouting Lab, player matchup predictions, team matchup predictions, On/Off Impact and Breakout Watch. Runtime reads compact `app_data/` CSVs and locally trained `artifacts/`; no Docker, database or live API key is required.
+
+From a Python 3.12 environment:
+
+```powershell
+python -m pip install -r requirements.txt
+python scripts/build_dataset.py --start-season 2015
+python scripts/validate_data.py
+python scripts/train_models.py --profile core
+python -m unittest discover -s tests -v
+python -m streamlit run app.py
+```
+
+Build inputs are the manually downloaded Kaggle CSVs under `data/raw/kaggle/` and `data/raw/kaggle_odds/`. Existing app-ready assets allow launch without raw files. See [demo/setup](docs/DEMO.md), [sources](DATA.md), [schema](docs/DATA_DICTIONARY.md) and [model limitations](docs/MODEL_CARDS.md). Do not push or deploy automatically.
+
+Sources: [Eoin A Moore's NBA data](https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores) and [cviaxmiwnptr's historical betting data](https://www.kaggle.com/datasets/cviaxmiwnptr/nba-betting-data-october-2007-to-june-2024). Optional current quotes come from [The Odds API](https://the-odds-api.com/).
+
+Predictions are estimates, not guarantees. Opposing-player encounters do not identify guarding assignments. On/off is observational. Unsupported advanced season metrics show N/A. Source coverage and calibration limitations are documented, not concealed.
+
+## Historical project overview
+
 ## Overview
 
 CourtIQ is an interactive NBA analytics platform that organizes current and historical player, team, and game data into clear profiles and visualizations. The goal is to make NBA statistics easier to understand for casual fans and fantasy basketball players without requiring them to search across multiple websites or interpret large statistical tables.

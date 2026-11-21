@@ -1,5 +1,15 @@
 # CourtIQ application plan
 
+## Current implementation contract
+
+The approved November CSV presentation build supersedes the historical plan below. `app.py` routes Players (Scouting/Impact), Teams (predictions), Compare (opposing-player encounters) and Trends (breakout). `src/dashboard.py` renders the integrated UI; feature modules calculate independently. `src/pipeline.py` owns one raw-to-processed-to-app-data pipeline. `src/models/` owns offline training, chronological evaluation and inference. `src/odds_api.py` is an explicit daily cache refresh, never a navigation-time request.
+
+Raw/full data stay ignored under `data/`. Runtime uses compact tracked `app_data/` exports and trusted `artifacts/` models with matching data versions. No database, separate API server, neural framework or GPU is required. Historical onboarding functions/scripts remain available for reference and existing checks.
+
+Models use strictly prior observations, season-based splits, training-only imputation/scaling, validation selection and separate calibration-period residuals. Historical inference before calibration availability is rejected; saved backtests are used instead. See [model cards](docs/MODEL_CARDS.md), [data dictionary](docs/DATA_DICTIONARY.md), and [demo](docs/DEMO.md).
+
+The older PostgreSQL/API roadmap below is retained as history, not a prerequisite for the CSV application.
+
 ## Purpose and audience
 
 CourtIQ helps casual NBA fans and people comparing player/team performance understand basketball statistics through clear context and interactive charts. Core work is descriptive analytics. Forecasting and similar-player models are approved stretch work only.

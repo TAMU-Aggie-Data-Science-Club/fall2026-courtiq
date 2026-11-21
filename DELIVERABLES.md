@@ -1,5 +1,9 @@
 # Deliverables & Timeline
 
+## Approved November presentation increment
+
+The unified PDF specification replaces the database-first product plan for this increment so the team can demonstrate one reproducible CSV application. Deliverables are the shared pipeline/validation, Scouting Lab, On/Off Impact, player/team prediction baselines and models, Breakout Watch, and integration/documentation. Neural experiments, unverified defensive assignments and optional impact metrics do not block the presentation build. Existing milestones below remain historical estimates; completion is established by executed checks and the final implementation report, not dates alone.
+
 > **How to read this file.** This is the PMs' best current estimate of what CourtIQ needs to ship and roughly when. It is a **living plan, not a contract**. Future task tracking lives in **GitHub Issues and the Project board**. Week 0 uses the PM's Discord announcement and reviewed PRs into `deliverable0`.
 
 This file is the high-level semester roadmap. Detailed weekly instructions live in the [weekly assignment index](weekly/README.md). [The deliverable structure](weekly/deliverables_structure.md) describes creation, proposed team responsibilities and review. Individual GitHub Issues remain authoritative for owners, task status, deadlines and changes; weekly documents explain the work and link to those issues. Week 0 requires no Issue; its deadline/updates are announced in Discord and individual submissions are reviewed through PRs into `deliverable0`.
