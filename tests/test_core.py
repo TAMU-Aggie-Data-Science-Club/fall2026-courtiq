@@ -106,5 +106,27 @@ class ScoutingTests(unittest.TestCase):
         self.assertTrue(target(20,5,15))
         for args in [(19.9,5,15),(20,4.9,15),(20,5,14.9)]: self.assertFalse(target(*args))
 
+    def test_lower_direction(self):
+        f=self.frame(); f.loc[0,"points_pg"]=5
+        r=rankings(f,"2025-26",directions={"points_pg":False})
+        row=r.query("player_id == 1 and metric == 'points_pg'").iloc[0]
+        self.assertEqual(row.percentile,100)
+        self.assertEqual(row["rank"],1)
+
+    def test_breakout_future_features(self):
+        f=pd.DataFrame(dict(player_id=[1,1],team_id=[0,0],season=["2024-25","2025-26"],season_start=[2024,2025],
+            games=[30,30],mpg=[20,25],pra_per36=[25,35],age=[23,24]))
+        before=season_features(f)
+        f.loc[1,["mpg","pra_per36"]]=[99,999]
+        after=season_features(f)
+        pd.testing.assert_series_equal(before.iloc[0],after.iloc[0])
+
+    def test_reproducible_model(self):
+        from src.models.common import estimator
+        x=pd.DataFrame({"feature":[0,1,2,3,4,5]}); y=np.array([0,0,0,1,1,1])
+        first=estimator(True).fit(x,y).predict_proba(x)
+        second=estimator(True).fit(x,y).predict_proba(x)
+        np.testing.assert_allclose(first,second)
+
 
 if __name__=="__main__": unittest.main()

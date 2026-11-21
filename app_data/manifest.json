@@ -1,5 +1,5 @@
 {
-  "built_at": "2026-11-21T01:37:01.600669+00:00",
+  "built_at": "2026-11-21T01:50:38.454647+00:00",
   "start_season": 2015,
   "source_urls": [
     "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores",
@@ -463,8 +463,9 @@
         "went_over": "float64",
         "line_timing": "object"
       },
-      "app_bytes": 69654
+      "app_bytes": 70557
     }
   },
-  "version": "83d14b78505d"
+  "pipeline_sha256": "589778f4e16079158a38365aa376b649257e4412acfdb1ee0e642e7f380db40d",
+  "version": "888fbe7340f0"
 }

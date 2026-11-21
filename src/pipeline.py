@@ -258,7 +258,8 @@ def build(start=2015):
             deploy=deploy[cols]
         deploy.to_csv(APP/f"{name}.csv.gz",index=False)
         manifest.setdefault("tables",{})[name] = {"rows":len(table),"app_rows":len(deploy),"columns":{c:str(deploy[c].dtype) for c in deploy},"app_bytes":(APP/f"{name}.csv.gz").stat().st_size}
-    manifest["version"] = hashlib.sha256(json.dumps(manifest["sources"],sort_keys=True).encode()).hexdigest()[:12]
+    manifest["pipeline_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    manifest["version"] = hashlib.sha256((json.dumps(manifest["sources"],sort_keys=True)+manifest["pipeline_sha256"]).encode()).hexdigest()[:12]
     (APP/"manifest.json").write_text(json.dumps(manifest,indent=2),encoding="utf-8")
     print(json.dumps({"games":len(games),"players":len(p),"seasons":len(seasons),"version":manifest["version"]}))
     return tables
@@ -270,7 +271,7 @@ def match_odds(games, teams):
         raise ValueError("Expected one historical odds CSV")
     o=pd.read_csv(paths[0])
     aliases={r.team_code.lower():r.team_id for r in teams.itertuples()}
-    for old,new in {"gs":"gsw","sa":"sas","no":"nop","ny":"nyk","bk":"bkn","brk":"bkn","pho":"phx","utah":"uta","was":"was"}.items():
+    for old,new in {"gs":"gsw","sa":"san","sas":"san","wsh":"was","no":"nop","ny":"nyk","bk":"bkn","brk":"bkn","pho":"phx","utah":"uta","was":"was"}.items():
         if new in aliases: aliases[old]=aliases[new]
     o["date"]=pd.to_datetime(o.date,errors="raise").dt.normalize()
     o["home_team_id"]=o.home.str.lower().map(aliases)

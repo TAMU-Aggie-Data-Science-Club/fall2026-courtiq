@@ -26,7 +26,7 @@ def canonical(frame):
     return pd.concat(rows,ignore_index=True) if rows else frame.iloc[:0].copy()
 
 
-def rankings(frame, season, lens="All-Around", min_games=20, min_mpg=15):
+def rankings(frame, season, lens="All-Around", min_games=20, min_mpg=15, directions=None):
     f=canonical(frame)
     f=f[f.season.eq(season)].copy()
     f["fg3a_pg"]=f.fg3a/f.games.replace(0,np.nan)
@@ -37,9 +37,10 @@ def rankings(frame, season, lens="All-Around", min_games=20, min_mpg=15):
         threshold=f.fg3a.ge(50) if metric=="fg3_pct" else f.fta.ge(50) if metric=="ft_pct" else True
         eligible=base&threshold&f[metric].notna()
         values=f[metric].where(eligible)
+        higher_better=(directions or {}).get(metric,True)
         pieces.append(pd.DataFrame({"player_id":f.player_id,"season":season,"metric":metric,
-            "label":label,"value":f[metric],"percentile":values.rank(method="average",pct=True)*100,
-            "rank":values.rank(method="average",ascending=False),"population":int(eligible.sum()),
+            "label":label,"value":f[metric],"percentile":values.rank(method="average",pct=True,ascending=higher_better)*100,
+            "rank":values.rank(method="average",ascending=not higher_better),"population":int(eligible.sum()),
             "qualified":eligible}))
     return pd.concat(pieces,ignore_index=True)
 
