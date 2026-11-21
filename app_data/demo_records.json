@@ -1,0 +1,47 @@
+[
+  {
+    "player_id":1629029,
+    "player_name":"Luka Doncic",
+    "season":"2025-26",
+    "games":64,
+    "points_pg":33.484375,
+    "rebounds_pg":7.734375,
+    "assists_pg":8.28125
+  },
+  {
+    "player_id":1628983,
+    "player_name":"Shai Gilgeous-Alexander",
+    "season":"2025-26",
+    "games":68,
+    "points_pg":31.1323529412,
+    "rebounds_pg":4.2941176471,
+    "assists_pg":6.5882352941
+  },
+  {
+    "player_id":1630162,
+    "player_name":"Anthony Edwards",
+    "season":"2025-26",
+    "games":61,
+    "points_pg":28.8032786885,
+    "rebounds_pg":4.9508196721,
+    "assists_pg":3.7049180328
+  },
+  {
+    "player_id":1627759,
+    "player_name":"Jaylen Brown",
+    "season":"2025-26",
+    "games":71,
+    "points_pg":28.7042253521,
+    "rebounds_pg":6.9295774648,
+    "assists_pg":5.1267605634
+  },
+  {
+    "player_id":1630178,
+    "player_name":"Tyrese Maxey",
+    "season":"2025-26",
+    "games":70,
+    "points_pg":28.2857142857,
+    "rebounds_pg":4.1428571429,
+    "assists_pg":6.5857142857
+  }
+]

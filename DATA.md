@@ -1,5 +1,21 @@
 # Data
 
+## Current CSV application (November 2026)
+
+The presentation build follows the approved unified specification. The older API/database sections below describe the retained onboarding prototype, not the current runtime. No new source is fetched on page navigation.
+
+| Source | Origin/URL | Access method | License | Sensitivity | Notes |
+| --- | --- | --- | --- | --- | --- |
+| Historical NBA Data and Player Box Scores, Eoin A Moore | https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores | User's manual CSV download into `data/raw/kaggle/` | CC0 reported by supplied specification; downloaded archive lacks license/version metadata | Public sports statistics; player birthdates retained only for age calculation | Exact file hashes in `app_data/manifest.json`; no play-by-play loaded. Verify redistribution rights before public release. |
+| NBA Betting Data, cviaxmiwnptr | https://www.kaggle.com/datasets/cviaxmiwnptr/nba-betting-data-october-2007-to-june-2024 | User's manual CSV download into `data/raw/kaggle_odds/` | CC0 reported by supplied specification; independently verified version/license TBD | Public game/market statistics | Actual file is `nba_2008-2026.csv`; favorite-magnitude spread normalized to signed home spread. Opening/closing timing unknown: retrospective benchmark only. |
+| The Odds API | https://the-odds-api.com/ | Explicit daily cached API request; key from `ODDS_API_KEY` | Provider terms; verify account quota and redistribution terms before activation | Public event/market quotes; API key is secret | No historical paid calls, props or roster/injury claims. No live request made during implementation tests. |
+
+`data/` remains ignored. `app_data/` contains only compact derived application assets, not raw downloads. All commits are local; public deployment is not authorized. The pipeline writes source hashes, date/season coverage, sizes, schema and source limitations. Four games have missing duration/player coverage; score reconciliation exceptions remain visible in ignored `data/processed/validation_report.md` and `score_mismatches.csv`. No values are silently repaired.
+
+The data dictionary is [docs/DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md). Do not treat game-level arithmetic means of advanced metrics as authoritative season values. Unsupported season advanced values remain N/A. Missing player team IDs are resolved only through unique game/home-away identity.
+
+## Historical onboarding documentation
+
 This file explains **CourtIQ's** data sources — where they come from, how to get them, and how to think about using them.
 
 > **`DATA.md` is tracked in git. The `data/` folder is not.** Raw data is often large or governed by ToS, and must never be committed. Clone the repo, then populate `data/` locally.
