@@ -1,5 +1,6 @@
 """Presentation UI consuming only compact app-ready files and trusted models."""
 from datetime import timedelta
+from html import escape
 import json
 import numpy as np
 import pandas as pd
@@ -22,10 +23,42 @@ def table(name,version):
     return frame
 
 
-def choose(frame,key,label="Player"):
+@st.cache_data
+def scouting_game_dates(version):
+    path = APP / "player_games.csv.gz"
+    if not path.exists():
+        return {}
+    games = pd.read_csv(path, usecols=["season", "date", "played"], parse_dates=["date"])
+    return games.loc[games.played].groupby("season").date.max().to_dict()
+
+
+@st.cache_data
+def scouting_team_game_counts(version):
+    path = APP / "team_games.csv.gz"
+    if not path.exists():
+        return {}
+    games = pd.read_csv(path, usecols=["season", "team_id", "game_id"])
+    counts = games.groupby(["season", "team_id"]).game_id.nunique()
+    return {season: rows.droplevel("season").to_dict() for season, rows in counts.groupby(level="season")}
+
+
+def scouting_freshness(season, manifest):
+    latest = scouting_game_dates(manifest["version"]).get(season)
+    built = pd.to_datetime(manifest.get("built_at"), utc=True, errors="coerce")
+    labels = []
+    if pd.notna(latest):
+        labels.append(f"Games included through {latest:%b} {latest.day}, {latest.year}")
+    if pd.notna(built):
+        built = built.tz_convert("America/Chicago")
+        labels.append(f"Box-score snapshot prepared {built:%b} {built.day}, {built.year}")
+    if labels:
+        st.caption(" · ".join(labels))
+
+
+def choose(frame,key,label="Player",index=0):
     names=frame.drop_duplicates("player_id").set_index("player_id").player_name.to_dict()
     if not names: return None
-    return st.selectbox(label,list(names),format_func=names.get,key=key)
+    return st.selectbox(label,list(names),format_func=names.get,key=key,index=index)
 
 
 def methodology(manifest):
@@ -38,33 +71,372 @@ def methodology(manifest):
         st.write("Historical line timing is unknown. Market comparisons are retrospective, not a demonstrated trading strategy. Predictions are educational statistical estimates; actual outcomes may differ.")
 
 
-def scouting_page(seasons,version):
+SCOUT_BADGES = {
+    "Elite Scorer": "🔥",
+    "Sharpshooter": "🎯",
+    "Playmaker": "🤝",
+    "Rebounding Specialist": "🏀",
+    "All-Around Contributor": "⭐",
+}
+
+TEAM_ACCENTS = {
+    "ATL": "#E03A3E", "BKN": "#777A80", "BOS": "#007A33", "CHA": "#1D1160",
+    "CHI": "#CE1141", "CLE": "#860038", "DAL": "#00538C", "DEN": "#0E2240",
+    "DET": "#C8102E", "GSW": "#1D428A", "HOU": "#CE1141", "IND": "#FDBB30",
+    "LAC": "#C8102E", "LAL": "#552583", "MEM": "#5D76A9", "MIA": "#98002E",
+    "MIL": "#00471B", "MIN": "#236192", "NOP": "#85714D", "NYK": "#F58426",
+    "OKC": "#007AC1", "ORL": "#0077C0", "PHI": "#006BB6", "PHX": "#E56020",
+    "POR": "#E03A3E", "SAC": "#5A2D81", "SAN": "#69727C", "TOR": "#CE1141",
+    "UTA": "#6B2DBD", "WAS": "#002B5C",
+}
+
+SCOUT_STYLE = """
+<style>
+.scout-header {margin:.9rem 0; text-align:center;}
+.scout-badges {display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:.45rem;}
+.scout-identity h3 {margin:0; padding:0; font-size:clamp(1.55rem,4vw,2.25rem); font-weight:750;}
+.scout-identity p {margin:.25rem 0 0;}
+.scout-team-position {font-size:.95rem;}
+.scout-team-name {white-space:nowrap;}
+.scout-team-dot {display:inline-block; width:.6em; height:.6em; border-radius:50%;
+    margin-inline-end:.38em; background:var(--team-accent);
+    border:1px solid color-mix(in srgb,var(--team-accent),currentColor 25%);
+    vertical-align:.04em;}
+.scout-badges:not(:empty) {margin-top:.5rem;}
+.scout-chip {border:1px solid var(--accent); border-radius:999px; padding:.22rem .6rem;
+    background:color-mix(in srgb,var(--accent) 12%,transparent); font-size:.82rem;}
+.scout-grid {display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.65rem;}
+.scout-cards {grid-template-columns:repeat(4,minmax(0,1fr)); margin-bottom:1rem;}
+.scout-tile {border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);
+    border-inline-start:4px solid var(--accent); border-radius:.65rem; padding:.65rem .8rem;
+    background:color-mix(in srgb,var(--accent) 8%,transparent);}
+.scout-tile strong {display:block; font-size:1.35rem;}
+.scout-metric-heading {display:flex; flex-wrap:wrap; justify-content:space-between; gap:.3rem;}
+.scout-detail {font-size:.82rem; margin:.25rem 0 0;}
+.scout-crown {display:inline-block; background:#fff1c7; color:#664900;
+    border-radius:999px; padding:0 .25rem;}
+.st-key-scout_lens [data-testid="stButtonGroup"] button {flex:1;}
+.scout-track {height:.45rem; border-radius:999px; overflow:hidden;
+    background:color-mix(in srgb,var(--accent) 18%,transparent); margin-top:.4rem;}
+.scout-track span {display:block; height:100%; background:var(--accent); border-radius:inherit;}
+.scout-legend {display:flex; flex-wrap:wrap; gap:.4rem; margin:.25rem 0 .75rem;}
+@media(max-width:640px) {
+    .scout-grid {grid-template-columns:1fr;}
+    .scout-cards {grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+</style>
+"""
+
+
+def scouting_metric_cards(breakdown, player_row, min_games=20, show_crowns=True):
+    cards = []
+    for _, metric in breakdown.iterrows():
+        title, definition, _ = scouting.METRIC_DETAILS[metric.metric]
+        raw_value = scouting.display_value(metric.metric, metric.value)
+        percentile = metric.percentile
+        color = scouting.percentile_color(percentile)
+        crown = ""
+        if metric.qualified:
+            placement = f"{scouting.percentile_label(percentile)} percentile"
+            rank = metric["rank"]
+            detail = f"Rank {rank:g} of {metric.population:,}"
+            if show_crowns and rank == 1:
+                crown = ' <span class="scout-crown" title="Ranked first in the league" aria-label="Ranked first in the league">👑</span>'
+            track = (
+                f'<div class="scout-track" aria-hidden="true">'
+                f'<span style="width:{percentile:g}%"></span></div>'
+            )
+        else:
+            placement = "Unranked"
+            detail = scouting.ranking_status(metric.metric, player_row, min_games)
+            track = ""
+        if metric.metric in ("drtg", "netrtg"):
+            coverage = player_row.get("ratings_coverage", np.nan)
+            if pd.notna(coverage):
+                detail += f" · {coverage:.1%} of minutes covered"
+        cards.append(f"""
+            <div class="scout-tile" style="--accent:{color}">
+                <div class="scout-metric-heading"><b>{title}{crown}</b><b>{placement}</b></div>
+                <div class="scout-detail">{raw_value} · {detail}</div>
+                {track}
+                <div class="scout-detail">{definition}</div>
+            </div>
+        """)
+    st.html('<div class="scout-grid">' + "".join(cards) + "</div>")
+
+
+def scouting_advanced_stats(row):
+    cards = []
+    for metric, (label, precision, definition) in scouting.ADVANCED.items():
+        value = row.get(metric, np.nan)
+        if pd.notna(value) and np.isfinite(value):
+            cards.append(f"""
+                <div class="scout-tile" style="--accent:#2457a7">
+                    <b>{label}</b><strong>{value:{precision}}</strong>
+                    <div class="scout-detail">{definition}</div>
+                </div>
+            """)
+    if cards:
+        st.subheader("Advanced season stats")
+        st.html('<div class="scout-grid">' + "".join(cards) + "</div>")
+
+
+def scouting_sources():
+    with st.expander("Sources and how to read the rankings"):
+        comparison, production, shooting, defense, advanced, badges = st.tabs(
+            ["Rankings & sources", "Game stats", "Shooting", "Defense & rebounding", "Advanced stats", "Badges"]
+        )
+        with comparison:
+            st.markdown(
+                f"""
+- **Season, teams, and position** — The page combines regular-season appearances across the teams listed under the player's name. The position on that line shows where the player started most often that season. An additional position appears if it accounts for at least two starts and 25% of recorded starts. The team filter helps find players.
+- **Who qualifies** — Players normally need 20 games and 15 minutes per game. The latest season, if still in progress, uses a 5-game minimum until the snapshot includes at least 20 games for every team. Early rankings can swing sharply and badges and crowns start once standard qualification resumes. Three-point percentage requires 50 three-point attempts, and free-throw percentage requires 50 free-throw attempts in every season.
+- **Rank** — Rank 1 is the highest value for most stats. Defensive Rating and Foul Avoidance rank lower raw values first. “Rank 12 of 230” means 230 players qualified for that stat. Ties share the average of their positions. 👑 marks rank 1 when standard rankings apply.
+- **Percentile** — Places a player's value on a 0–100 scale within that stat's eligible group. A 90th percentile is near the top tenth. The page rounds percentile labels to whole numbers.
+- **Unranked** — The player missed a qualification cutoff or the stat was unavailable. Look under the stat for the reason.
+- **Coverage** — The date near the filters shows the latest player game in the selected season. The snapshot preparation date is recorded in CourtIQ. The original download date is unavailable. Some games are missing, including in 2024–25. The latest season may be in progress. [Historical NBA box scores]({SOURCE_NBA})
+                """
+            )
+        with production:
+            st.markdown(
+                """
+- **GP · Games played** — Counts regular-season appearances with more than zero recorded minutes.
+- **MPG · Minutes per game** — Total minutes divided by games played. Helps explain how much time a player had to produce.
+- **PPG · Points per game** — Total points divided by games played. Measures scoring volume.
+- **APG · Assists per game** — Credited assists divided by games played. An assist credits a pass that directly leads to a made basket.
+- **Rebounds per game** — Offensive plus defensive rebounds divided by games played.
+- **Steals per game** — Credited steals divided by games played. A steal credits a defender for taking possession from the opponent.
+- **Blocks per game** — Credited blocked shots divided by games played. Steals and blocks capture specific defensive plays.
+                """
+            )
+        with shooting:
+            st.markdown(
+                """
+- **Field-goal %** — Made field goals divided by field-goal attempts. Includes twos and threes.
+- **Two-point %** — Made twos divided by attempted twos.
+- **Three-point %** — Made threes divided by attempted threes.
+- **Free-throw %** — Made free throws divided by attempted free throws.
+- **True shooting (TS%)** — Points divided by twice the sum of field-goal attempts and 44% of free-throw attempts. The free-throw adjustment estimates how many scoring attempts those trips used.
+- **Effective FG% (eFG%)** — Adds half a make for every made three, then divides by field-goal attempts. The extra weight reflects that threes are worth more than twos.
+- **3PA per game** — Three-point attempts divided by games played. A higher rank means more attempts per game.
+- **Free-throw rate** — Free-throw attempts per 100 field-goal attempts. Shows how often a player gets to the line relative to their shot volume.
+                """
+            )
+        with defense:
+            st.markdown("**Per 36 minutes** divides each season count by minutes played and multiplies by 36.")
+            st.markdown("\n".join(f"- **{label}** — {definition}"
+                                  for label, definition, _ in scouting.DEFENSE.values()))
+            st.markdown(
+                "**Ratings coverage.** Defensive and Net Rating use on-court points and possessions "
+                "reconstructed from the Kaggle game box scores. We sum the counts across games that "
+                "have a unique result. A player needs at least 95% of their season minutes covered. "
+                "The rating cards show the actual share covered."
+            )
+            st.markdown(
+                "**Team DREB share.** Divide the player's total defensive rebounds by their teams' "
+                "total defensive rebounds in games they played. We use the player's team in each game "
+                "and require complete rebound records. A 15% share means the player grabbed 15 of every "
+                "100 team defensive rebounds in those games. Playing time affects this share because "
+                "the team total covers the whole game."
+            )
+            st.markdown(
+                "**Limits.** Ratings reflect teammates and lineups. Steals and blocks capture specific "
+                "plays, and the lens describes a statistical profile."
+            )
+        with advanced:
+            st.markdown(
+                """
+- **True shooting and effective FG%** — The same season-total efficiency measures described in the **Shooting** tab.
+- **Assist-to-turnover ratio** — Season assists divided by season turnovers. A ratio of 3.00 means three assists per turnover. It is unavailable when there are zero recorded turnovers.
+- **Points per 36 minutes** — Season points divided by minutes played, multiplied by 36.
+- **Rebounds per 36 minutes** — Season rebounds divided by minutes played, multiplied by 36.
+- **Assists per 36 minutes** — Season assists divided by minutes played, multiplied by 36.
+- **How to read per-36 stats** — They put players on the same playing-time scale. Rates from a small number of minutes can swing more, and a player's rate may change with a different role.
+                """
+            )
+        with badges:
+            badge_rules = {
+                "Elite Scorer": "90th percentile or higher in points per game.",
+                "Sharpshooter": "85th percentile or higher in three-point percentage. The player must qualify for the three-point ranking.",
+                "Playmaker": "85th percentile or higher in assists per game.",
+                "Rebounding Specialist": "90th percentile or higher in rebounds per game.",
+                "All-Around Contributor": "75th percentile or higher in at least four All-Around stats.",
+            }
+            st.markdown("**All-Around badges**")
+            st.write("The player header shows up to three All-Around badges.")
+            for badge, rule in badge_rules.items():
+                st.markdown(f"- {SCOUT_BADGES[badge]} **{badge}** — {rule}")
+            st.markdown("**Defense & Rebounding badges**")
+            for badge, (icon, requirements) in scouting.DEFENSIVE_BADGES.items():
+                rule = " and ".join(
+                    f"{cutoff}th percentile or higher in {scouting.DEFENSE[metric][0]}"
+                    for metric, cutoff in requirements.items()
+                )
+                st.markdown(f"- {icon} **{badge}** — {rule}.")
+            st.caption("Defensive Playmaker takes the place of Shot Blocker and Ball Hawk when earned.")
+
+
+def scouting_defense_cohort(league):
+    path = APP / "scouting_ratings.csv.gz"
+    if not path.exists():
+        return league
+    ratings = table("scouting_ratings", path.stat().st_mtime_ns)
+    comparison = league.merge(
+        ratings, on=["player_id", "season_start", "games", "minutes"], how="left",
+        validate="one_to_one", suffixes=("", "_reconstructed"),
+    )
+    for metric in ("drtg", "netrtg"):
+        if metric in league:
+            comparison[metric] = comparison.pop(f"{metric}_reconstructed")
+    return comparison
+
+
+def scouting_page(seasons, teams, manifest):
+    st.html(SCOUT_STYLE)
     st.header("Player Scouting Lab")
-    st.caption("Production, efficiency & league context in one place.")
-    available=sorted(seasons.loc[seasons.season_start>=2023,"season"].unique(),reverse=True)
-    season=st.selectbox("Season",available,index=min(1,len(available)-1),key="scout_season")
-    f=scouting.canonical(seasons)
-    f=f[f.season.eq(season)]
-    pid=choose(f,"scout_player")
-    if pid is None: st.info("No player seasons available."); return
-    lens=st.selectbox("Scouting lens",["All-Around","Shooting"])
-    row=f[f.player_id.eq(pid)].iloc[0]
-    st.subheader(row.player_name)
-    for col,label,value in zip(st.columns(4),["Games","Minutes / game","Points / game","Assists / game"],[row.games,row.mpg,row.points_pg,row.assists_pg]):
-        col.metric(label,f"{value:.1f}" if pd.notna(value) else "N/A")
-    ranks=scouting.rankings(seasons,season,lens)
-    b=ranks[ranks.player_id.eq(pid)]
-    if not b.qualified.all(): st.info("Some axes are not qualified. N/A axes are not replaced with zero or a league-average value.")
-    st.plotly_chart(scouting.radar(b),use_container_width=True)
-    st.dataframe(b[["label","value","percentile","rank","population","qualified"]],hide_index=True,width="stretch")
-    badges,text=scouting.report(scouting.rankings(seasons,season).query("player_id == @pid"))
-    st.write(" · ".join(badges) if badges else "No qualifying badges")
-    st.write(text)
-    st.caption("Badges and summary use the All-Around lens consistently, even when the shooting chart is selected.")
-    st.subheader("Advanced Player Statistics")
-    advanced=pd.DataFrame([dict(metric=k,value=row.get(k,np.nan),meaning=label) for k,label in scouting.ADVANCED.items()])
-    st.dataframe(advanced,hide_index=True,width="stretch")
-    st.caption("Percentages are fractions (0.60 = 60%). TS/eFG are calculated from season totals. Other season advanced values show N/A until a reliable aggregation is validated.")
+    available = sorted(seasons.loc[seasons.season_start >= 2023, "season"].unique(), reverse=True)
+    if not available:
+        st.info("No player seasons are available.")
+        return
+
+    season_col, team_col, player_col = st.columns([1, 1.25, 1.75])
+    season = season_col.selectbox("Season", available, index=min(1, len(available) - 1), key="scout_season")
+    season_rows = seasons[seasons.season.eq(season)]
+    league = scouting.canonical(season_rows)
+    provisional = False
+    completed_start = manifest.get("latest_completed_start")
+    if season == available[0] and completed_start is not None and int(season[:4]) > completed_start:
+        counts = scouting_team_game_counts(manifest["version"]).get(season, {})
+        provisional = any(counts.get(tid, 0) < 20 for tid in teams.team_id)
+    min_games = 5 if provisional else 20
+    team_lookup = teams.set_index("team_id")
+    team_names = team_lookup.team_name.to_dict()
+    team_codes = team_lookup.team_code.to_dict()
+    stints = season_rows[season_rows.team_id.ne(0)]
+    team_ids = sorted(stints.team_id.unique(), key=lambda tid: team_names.get(tid, str(tid)))
+    team_id = team_col.selectbox(
+        "Find by team", [0, *team_ids],
+        format_func=lambda tid: "All teams" if tid == 0 else team_names.get(tid, f"Team {tid}"),
+        key="scout_team",
+    )
+    roster = league
+    if team_id:
+        roster = league[league.player_id.isin(stints.loc[stints.team_id.eq(team_id), "player_id"])]
+    roster = roster.sort_values("player_name").reset_index(drop=True)
+    qualified = roster[roster.games.ge(min_games) & roster.mpg.ge(15)]
+    leaders = qualified.points_pg.dropna()
+    default_player = int(leaders.idxmax()) if not leaders.empty else 0
+    with player_col:
+        pid = choose(roster, "scout_player", "Search player", index=default_player)
+    scouting_freshness(season, manifest)
+    st.caption("The team filter finds players who appeared for that team. Stats combine all teams played for, and ranks compare across the league in the selected season.")
+    if pid is None:
+        st.info("No players match this selection.")
+        return
+
+    row = league[league.player_id.eq(pid)].iloc[0]
+    all_around = scouting.rankings(league, season, min_games=min_games).query("player_id == @pid")
+    defense_league = scouting_defense_cohort(league)
+    defense_row = defense_league[defense_league.player_id.eq(pid)].iloc[0]
+    defense = scouting.rankings(
+        defense_league, season, scouting.DEFENSE_LENS, min_games=min_games,
+    ).query("player_id == @pid")
+    if provisional:
+        badges, defensive_badges = [], []
+        all_around_summary = scouting.scouting_summary(all_around, row.player_name)
+    else:
+        badges, all_around_summary = scouting.report(all_around, row.player_name)
+        defensive_badges = scouting.defensive_badges(defense)
+    player_team_ids = set(stints.loc[stints.player_id.eq(pid), "team_id"])
+    season_teams = []
+    for tid in team_ids:
+        if tid not in player_team_ids:
+            continue
+        name = escape(str(team_names.get(tid, f"Team {tid}")))
+        accent = TEAM_ACCENTS.get(team_codes.get(tid), "#64748b")
+        season_teams.append(
+            f'<span class="scout-team-name"><span class="scout-team-dot" aria-hidden="true" '
+            f'style="--team-accent:{accent}"></span>{name}</span>'
+        )
+    chips = []
+    position, position_detail = scouting.starting_position(defense_row)
+    identity = " · ".join(part for part in (" / ".join(season_teams), escape(position)) if part)
+    identity_line = f'<p class="scout-team-position">{identity}</p>' if identity else ""
+    for badge in badges:
+        icon = SCOUT_BADGES[badge]
+        chips.append(f'<span class="scout-chip" style="--accent:#0f766e">{icon} {badge}</span>')
+    for badge in defensive_badges:
+        icon, _ = scouting.DEFENSIVE_BADGES[badge]
+        chips.append(f'<span class="scout-chip" style="--accent:#2457a7">{icon} {badge}</span>')
+    st.html(
+        f'<div class="scout-header"><div class="scout-identity">'
+        f'<h3>{escape(row.player_name)}</h3>{identity_line}</div>'
+        f'<div class="scout-badges">{"".join(chips)}</div></div>'
+    )
+    metrics = [
+        ("GP", "Games played", row.games, ".0f"),
+        ("MPG", "Minutes per game", row.mpg, ".1f"),
+        ("PPG", "Points per game", row.points_pg, ".1f"),
+        ("APG", "Assists per game", row.assists_pg, ".1f"),
+    ]
+    cards = []
+    for label, definition, value, precision in metrics:
+        number = format(value, precision) if pd.notna(value) else "—"
+        cards.append(
+            '<div class="scout-tile" style="--accent:#2457a7">'
+            f'<b>{label}</b><strong>{number}</strong><span>{definition}</span></div>'
+        )
+    st.html('<div class="scout-grid scout-cards">' + "".join(cards) + "</div>")
+    st.subheader(f"{row.player_name} · League comparison")
+    st.write(
+        "Each percentile compares this player with eligible players in the same season. Most "
+        "stats rank higher values first. Defensive Rating and Foul Avoidance rank lower raw values "
+        "first, and volume stats show how often something happens."
+    )
+    if provisional:
+        st.warning(
+            "**Early-season rankings.** The minimum to qualify drops from 20 games played to 5, "
+            "with at least 15 minutes per game played. With so few games, percentiles can be "
+            "misleading and change sharply after a single game."
+        )
+    lens = st.segmented_control(
+        "Scouting lens", list(scouting.LENSES), default="All-Around",
+        selection_mode="single", key="scout_lens", width="stretch",
+    ) or "All-Around"
+    breakdown = all_around
+    report_title = "All-around scouting report"
+    summary = all_around_summary
+    if lens == scouting.DEFENSE_LENS:
+        breakdown = defense
+        row = defense_row
+        report_title = "Defensive scouting report"
+        summary = scouting.defense_report(breakdown, row.player_name)
+    elif lens == "Shooting":
+        breakdown = scouting.rankings(league, season, lens, min_games=min_games).query("player_id == @pid")
+        report_title = "Shooting scouting report"
+        summary = scouting.scouting_summary(breakdown, row.player_name)
+    st.plotly_chart(
+        scouting.radar(breakdown, show_crowns=not provisional, player_name=row.player_name),
+        use_container_width=True, theme=None,
+    )
+    st.markdown(f"**{report_title}**")
+    st.write(summary)
+    if lens == scouting.DEFENSE_LENS:
+        st.caption("Steals and blocks capture specific plays. On-court ratings also reflect teammates and lineups.")
+    st.markdown("**Stat by stat**")
+    legend = [(85, "85 and above"), (50, "50 to below 85"), (30, "30 to below 50"),
+              (0, "Below 30"), (np.nan, "Unranked")]
+    legend_labels = [
+        f'<span class="scout-chip" style="--accent:{scouting.percentile_color(value)}">{label}</span>'
+        for value, label in legend
+    ]
+    st.html('<div class="scout-legend">' + "".join(legend_labels) + "</div>")
+    scouting_metric_cards(breakdown, row, min_games=min_games, show_crowns=not provisional)
+    scouting_advanced_stats(row)
+    if position_detail:
+        with st.expander("Position details"):
+            st.write(position_detail)
+    scouting_sources()
 
 
 def impact_page(impacts,teams):
