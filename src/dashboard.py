@@ -132,32 +132,232 @@ def scouting_page(seasons,version,teams):
             st.write(f"{label} · {value:.1%}" if pd.notna(value) else f"{label} · Unavailable")
 
 
-def impact_page(impacts,teams):
+IMPACT_STYLE = """
+<style>
+.stMainBlockContainer {padding-top:3.75rem;}
+.impact-identity {text-align:center; margin:1rem 0;}
+.impact-identity h3 {margin:0; padding:0; font-size:clamp(1.55rem,4vw,2.25rem);}
+.impact-identity p {margin:.25rem 0 0;}
+.impact-team-dot {display:inline-block; width:.62em; height:.62em; border-radius:50%;
+    background:var(--accent); margin-inline-end:.4em; vertical-align:.04em;}
+.impact-grid {display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.65rem;}
+.impact-tile {border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);
+    border-inline-start:4px solid var(--accent); border-radius:.65rem; padding:.75rem .9rem;
+    background:color-mix(in srgb,var(--accent) 8%,transparent);}
+.impact-tile strong {display:block; font-size:1.5rem;}
+.impact-tile p {margin:.25rem 0 0; font-size:.86rem;}
+.impact-stint-key {display:flex; flex-wrap:wrap; gap:.45rem 1rem; font-size:.9rem;}
+.impact-stint-key span {display:inline-flex; align-items:center; gap:.35rem;}
+.impact-stint-key b {display:inline-flex; align-items:center; justify-content:center;
+    box-sizing:border-box; flex:0 0 1.35rem; width:1.35rem; height:1.35rem;
+    padding:0; line-height:1; border:2px solid var(--accent); border-radius:50%;
+    background:#fffdf8; color:#202c36;}
+.impact-stint-key small {font-size:.85em;}
+@media(max-width:640px) {
+    .impact-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
+    .impact-grid .impact-tile:last-child {grid-column:1/-1;}
+}
+</style>
+"""
+
+
+def impact_cards(cards):
+    tiles = []
+    for label, value, unit, context, color in cards:
+        tiles.append(
+            f'<div class="impact-tile" style="--accent:{color}">'
+            f'<b>{label}</b><strong>{value}</strong><span>{unit}</span><p>{context}</p></div>'
+        )
+    st.html(f'<div class="impact-grid">{"".join(tiles)}</div>')
+
+
+@st.cache_data(show_spinner=False)
+def impact_player_games(version):
+    columns = ["game_id", "player_id", "team_id", "season", "date", "played", "minutes", "plus_minus"]
+    return pd.read_csv(APP / "player_games.csv.gz", usecols=columns, parse_dates=["date"])
+
+
+def impact_trend(season, pid, tid, team_games, version, color):
+    st.subheader("On/Off over time")
+    st.write(
+        "See how the team's on-court and bench margins changed as the season progressed. "
+        "Each point uses the last 10 appearances with usable box scores, starting after five."
+    )
+    player_games = impact_player_games(version)
+    stint = player_games.loc[
+        player_games.season.eq(season) & player_games.player_id.eq(pid) & player_games.team_id.eq(tid)
+    ]
+    trend = impact.rolling_margins(stint, team_games)
+    if trend.empty:
+        st.info("This team stint needs at least five appearances with usable box scores to show a trend.")
+        return
+    st.plotly_chart(impact.trend_chart(trend, color), use_container_width=True)
+    st.caption("Each line uses the total point margin and minutes in that stretch. Games with more minutes carry more weight.")
+
+
+def impact_league_comparison(season_rows, teams, pid, tid, min_games=20):
+    from html import escape
+
+    st.subheader("Compare with other players")
+    st.caption("Each ranking is for one player and team stint. The filter applies to the league comparison below.")
+    minimum = st.slider("Minimum on-court minutes", 0, 2500, 500, 100, key="impact_peer_minutes")
+    st.caption(
+        f"To appear in the scatterplot and table, a player needs {min_games} games played for that team, "
+        f"at least {minimum:,} on-court minutes, and scoring margins for both on-court and bench minutes."
+    )
+    if min_games == 5:
+        st.warning(
+            "**Early-season comparisons.** The game minimum drops from 20 to 5 until the snapshot "
+            "includes 20 games for every team. A few games can swing on/off margins and ranks sharply."
+        )
+    peers = impact.scout_peers(season_rows, minimum, pid, tid, min_games=min_games)
+    if peers.empty:
+        enough_games = season_rows.games.ge(min_games)
+        enough_minutes = season_rows.minutes_on.ge(minimum)
+        if not enough_games.any():
+            reason = f"No player has played {min_games} games for one team in this snapshot."
+        elif not (enough_games & enough_minutes).any():
+            reason = "No stint that meets the game minimum reaches this minutes cutoff. Try lowering the slider."
+        else:
+            reason = "The stints that meet the game and minutes minimums lack a usable on-court or bench margin."
+        st.info(f"No scatterplot or table to show. {reason}")
+        return
+    team_lookup = teams.set_index("team_id")
+    peers["team_name"] = peers.team_id.map(team_lookup.team_name).fillna("Team unavailable")
+    peers["team_accent"] = peers.team_id.map(team_lookup.team_code).map(COLORS).fillna("#db7335")
+    peers["stint_label"] = peers.player_name + " · " + peers.team_name
+    player_stints = peers.loc[peers.player_id.eq(pid)].sort_values(["team_name", "team_id"])
+    numbers = dict(zip(player_stints.team_id, range(1, len(player_stints) + 1)))
+    peers["stint_number"] = peers.team_id.map(numbers).where(peers.player_id.eq(pid)).astype("Int64")
+    selected = peers.loc[peers.selected]
+    st.caption(f"{len(peers):,} qualifying team stints across the league")
+    if selected.empty:
+        st.caption("The selected team stint is outside this comparison group.")
+    else:
+        rank = selected.iloc[0]["rank"]
+        st.write(f"**Selected team stint: #{rank} of {len(peers):,}**")
+    st.write(
+        "**Read the scatterplot:** Each dot is one player's team stint. Farther right means a higher "
+        "bench margin. Farther up means a higher on-court margin. "
+        "Above the dotted line, the on-court margin was higher. Below it, the bench margin was higher."
+    )
+    if numbers:
+        entries = []
+        for stint in player_stints.itertuples():
+            context = "<small>· Shown above</small>" if stint.team_id == tid else ""
+            entries.append(
+                f'<span><b style="--accent:{stint.team_accent}">{numbers[stint.team_id]}</b>'
+                f'{escape(stint.team_name)}{context}</span>'
+            )
+        st.html(f'<div class="impact-stint-key" aria-label="Numbered team stints">{"".join(entries)}</div>')
+    st.plotly_chart(impact.scatter(peers, pid, tid), use_container_width=True)
+    leaders = pd.concat([peers.head(8), selected]).drop_duplicates(["player_id", "team_id"])
+    display = pd.DataFrame({
+        "Rank": leaders["rank"],
+        "Player and team": leaders.stint_label.where(~leaders.selected, "★ " + leaders.stint_label),
+        "On/off per 48": leaders.on_off_diff.map(impact.signed_margin),
+        "On-court min": leaders.minutes_on.round().astype(int),
+        "Bench min": leaders.minutes_off.round().astype(int),
+    })
+    st.dataframe(display, hide_index=True, width="stretch")
+
+
+def impact_page(impacts, teams, manifest):
+    from html import escape
+
+    st.html(IMPACT_STYLE)
     st.header("On/Off Impact")
-    st.caption("Pick a player and team stint to see how the team’s scoring margin changes while they play. Use the minutes filter to compare players with similar playing time.")
-    available=sorted(impacts.loc[impacts.season_start>=2023,"season"].unique(),reverse=True)
-    season=st.selectbox("Season",available,index=min(1,len(available)-1),key="impact_season")
-    f=impacts[impacts.season.eq(season)].copy()
-    pid=choose(f,"impact_player")
-    if pid is None: st.info("No impact data."); return
-    lookup=teams.set_index("team_id").team_name.to_dict()
-    player_rows=f[f.player_id.eq(pid)]
-    tid=st.selectbox("Team stint",sorted(player_rows.team_id,key=lookup.get),format_func=lambda x:lookup.get(x,str(x)),key="impact_team")
-    row=player_rows[player_rows.team_id.eq(tid)].iloc[0]
-    heading(row.player_name,team_color(teams,tid))
-    st.caption(f"Reliability: {row.reliability}; {row.minutes_on:.0f} on minutes / {row.minutes_off:.0f} off minutes")
-    for col,field,label in zip(st.columns(4),["on_off_diff","on_per48","off_per48","game_score"],["On/off difference","On per 48","Off per 48","Mean Game Score"]):
-        value=row[field]; col.metric(label,f"{value:+.2f}" if pd.notna(value) else "N/A")
-    st.info(impact.missed_message(row))
-    comparison=pd.DataFrame({"Availability":["Played","Missed game"],"Average scoring margin":[row.with_margin,row.without_margin],"Win rate":[row.with_win_pct,row.without_win_pct]})
-    st.plotly_chart(px.bar(comparison,x="Availability",y="Average scoring margin",hover_data={"Win rate":":.0%"},color_discrete_sequence=[team_color(teams,tid)]),use_container_width=True)
-    minimum=st.slider("Leaderboard minimum on-court minutes",0,2500,500,100)
-    qualified=f[f.games.ge(20)&f.minutes_on.ge(minimum)]
-    st.plotly_chart(impact.scatter(qualified,pid),use_container_width=True)
-    with st.expander("Compare player minutes and impact"):
-        detail=qualified.nlargest(30,"on_off_diff")[["player_name","minutes_on","minutes_off","on_off_diff","reliability"]].copy()
-        detail.columns=["Player","Minutes on court","Minutes off court","Margin swing per 48","Reliability"]
-        st.dataframe(detail.round(1),hide_index=True,width="stretch")
+    st.write(
+        "See how a team scored relative to its opponents with a player on the court and on the bench. "
+        "Pick a season and player to see how those margins changed over time and how they compare across the league."
+    )
+    available = sorted(impacts.loc[impacts.season_start.ge(2023), "season"].unique(), reverse=True)
+    if not available:
+        st.info("No on/off seasons are available.")
+        return
+
+    season_col, team_col, player_col = st.columns([1, 1.25, 1.75])
+    season = season_col.selectbox("Season", available, index=min(1, len(available) - 1), key="impact_season")
+    season_rows = impacts.loc[impacts.season.eq(season)]
+    lookup = teams.set_index("team_id").team_name.to_dict()
+
+    def team_name(tid):
+        return lookup.get(tid, f"Team {tid}")
+
+    team_ids = sorted(season_rows.team_id.unique(), key=team_name)
+    team_filter = team_col.selectbox(
+        "Find by team", [0, *team_ids], key="impact_team_filter",
+        format_func=lambda tid: team_name(tid) if tid else "All teams",
+    )
+    roster = season_rows if team_filter == 0 else season_rows.loc[season_rows.team_id.eq(team_filter)]
+    with player_col:
+        pid = choose(roster, "impact_player", "Search player")
+    if pid is None:
+        st.info("No players match the selected season and team.")
+        return
+
+    player_rows = season_rows.loc[season_rows.player_id.eq(pid)].sort_values("minutes_on", ascending=False)
+    stints = player_rows.team_id.tolist()
+    tid = stints[0]
+    if len(stints) > 1:
+        default = stints.index(team_filter) if team_filter in stints else 0
+        tid = st.selectbox(
+            "Team stint", stints, index=default, format_func=team_name,
+            key=f"impact_stint_{season}_{pid}_{team_filter}",
+            help="Switch teams to see results for that team only.",
+        )
+    row = player_rows.loc[player_rows.team_id.eq(tid)].iloc[0]
+    color = team_color(teams, tid)
+    version = manifest["version"]
+    team_games = table("team_games", version)
+    min_games = 20
+    completed_start = manifest.get("latest_completed_start")
+    if season == available[0] and completed_start is not None and int(season[:4]) > completed_start:
+        counts = team_games.loc[team_games.season.eq(season)].groupby("team_id").game_id.nunique()
+        if counts.reindex(teams.team_id, fill_value=0).lt(20).any():
+            min_games = 5
+    latest = team_games.loc[team_games.season.eq(season) & team_games.team_id.eq(tid), "date"].max()
+    if pd.notna(latest):
+        st.caption(f"{team_name(tid)} team games included through {latest:%b} {latest.day}, {latest.year}.")
+    st.html(
+        f'<div class="impact-identity"><h3>{escape(row.player_name)}</h3>'
+        f'<p><span class="impact-team-dot" style="--accent:{color}" aria-hidden="true"></span>'
+        f'{escape(team_name(tid))} · {escape(season)}</p></div>'
+    )
+
+    st.subheader("On court vs. on bench")
+    st.write("Team point margin per 48 minutes, using games the player appeared in.")
+    on_minutes = f"{row.minutes_on:,.0f} minutes on court" if pd.notna(row.minutes_on) else "Minutes unavailable"
+    off_minutes = f"{row.minutes_off:,.0f} minutes on bench" if pd.notna(row.minutes_off) else "Minutes unavailable"
+    games_used = f"{row.valid_on_games:,.0f} of {row.games:,.0f} played games used"
+    impact_cards([
+        ("On court", impact.signed_margin(row.on_per48), "Points per 48", on_minutes, color),
+        ("On bench", impact.signed_margin(row.off_per48), "Points per 48", off_minutes, "#637783"),
+        ("On/Off difference", impact.signed_margin(row.on_off_diff), "Points per 48", games_used, "#b54b1c"),
+    ])
+    if pd.notna(row.on_per48) or pd.notna(row.off_per48):
+        st.plotly_chart(impact.margin_bars(row, color), use_container_width=True)
+    st.write(impact.court_summary(row))
+    if row.reliability == "Low":
+        st.info("Sample size: Limited. A short stretch on either side can make this comparison swing.")
+    elif pd.notna(row.reliability):
+        sample = "Large" if row.reliability == "High" else "Moderate"
+        st.caption(f"Sample size: {sample} · {games_used}")
+    st.caption("Teammates, opponents, and game situations also affect these margins.")
+
+    impact_trend(season, pid, tid, team_games, version, color)
+    impact_league_comparison(season_rows, teams, pid, tid, min_games=min_games)
+    with st.expander("How to read On/Off Impact"):
+        st.markdown(
+            f"""
+- **Team point margin** — Points scored minus points allowed. A positive margin means the team outscored opponents.
+- **Per 48 minutes** — Divide the total point margin by the minutes in each group and multiply by 48. Both groups use the same scale.
+- **On/Off difference** — The on-court margin minus the bench margin. Both groups use games the player appeared in with usable minutes and scoring data.
+- **Sample size** — Limited means under 500 minutes on court or under 250 on the bench, or minutes are unavailable. Large means at least 1,500 on court and 500 on the bench. Everything in between is Moderate.
+- **Trend** — Each point uses up to 10 recent appearances for the selected team. It starts after five usable games. A missing line means there were no usable minutes for that side of the comparison.
+- **What to take away** — These comparisons describe team results in the minutes and games covered. Rotations, teammates, and opponents all influence them. [Historical NBA box scores]({SOURCE_NBA})
+            """
+        )
 
 
 def performance(prefix):
