@@ -15,22 +15,28 @@ ADVANCED = {"ts_pct":"True shooting, from totals", "efg_pct":"Effective FG%, fro
             "netrtg":"Net rating, same basis as offense/defense", "pie":"Player Impact Estimate, box-score context"}
 
 
+LENSES = {"All-Around": ALL_AROUND, "Shooting": SHOOTING,
+          "Rebounding & defense": {"rebounds_pg": "Rebounds / game", "rebounds_per36": "Rebounds / 36 minutes",
+                                   "blocks_pg": "Blocks / game", "steals_pg": "Steals / game"},
+          "Playmaking": {"assists_pg": "Assists / game", "assists_per36": "Assists / 36 minutes",
+                         "ast_tov": "Assists per turnover", "points_pg": "Points / game"}}
+
 def canonical(frame):
     """Prefer TOT, otherwise require the sole team record; never silently double count."""
-    rows=[]
-    for _,g in frame.groupby(["player_id","season"],sort=False):
-        tot=g[g.team_id.eq(0)]
-        if len(tot)==1: rows.append(tot)
-        elif len(tot)==0 and len(g)==1: rows.append(g)
-        else: raise ValueError("Ambiguous combined player-season records")
-    return pd.concat(rows,ignore_index=True) if rows else frame.iloc[:0].copy()
+    groups = frame.groupby(["player_id", "season"], sort=False)
+    total = frame.team_id.eq(0)
+    selected = frame[total | groups.team_id.transform("size").eq(1)]
+    if len(selected) != groups.ngroups or selected.duplicated(["player_id", "season"]).any():
+        raise ValueError("Ambiguous combined player-season records")
+    return selected.reset_index(drop=True)
+
 
 
 def rankings(frame, season, lens="All-Around", min_games=20, min_mpg=15, directions=None):
     f=canonical(frame)
     f=f[f.season.eq(season)].copy()
     f["fg3a_pg"]=f.fg3a/f.games.replace(0,np.nan)
-    metrics=ALL_AROUND if lens=="All-Around" else SHOOTING
+    metrics=LENSES[lens]
     base=f.games.ge(min_games)&f.mpg.ge(min_mpg)
     pieces=[]
     for metric,label in metrics.items():
@@ -61,19 +67,19 @@ def report(breakdown):
     return badges[:3],f"{elite}: {strongest}. {kind}: {low.label}. Rankings describe this season's qualifying group, not overall player quality."
 
 
-def radar(breakdown):
+def radar(breakdown, color="#df7835"):
     import plotly.graph_objects as go
     b=breakdown.reset_index(drop=True)
     labels=b.label.tolist()
     values=b.percentile.tolist()
     complete=all(pd.notna(v) for v in values)
     fig=go.Figure()
-    fig.add_trace(go.Scatterpolar(r=[50]*9,theta=labels+[labels[0]],name="Median percentile reference (50)",line=dict(color="gray",dash="dot")))
+    fig.add_trace(go.Scatterpolar(r=[50]*(len(labels)+1),theta=labels+[labels[0]],name="Median percentile reference (50)",line=dict(color="gray",dash="dot")))
     theta=labels+[labels[0]]
     r=values+[values[0]]
     custom=b[["value","rank","population"]].values.tolist()
     fig.add_trace(go.Scatterpolar(r=r,theta=theta,fill="toself" if complete else "none",
         connectgaps=False,mode="lines+markers",name="Selected player",customdata=custom+[custom[0]],
-        line=dict(color="#d58b20"),hovertemplate="%{theta}<br>Raw: %{customdata[0]:.3f}<br>Percentile: %{r:.1f}<br>Rank: %{customdata[1]} / %{customdata[2]}<extra></extra>"))
+        line=dict(color=color),hovertemplate="%{theta}<br>Raw: %{customdata[0]:.3f}<br>Percentile: %{r:.1f}<br>Rank: %{customdata[1]} / %{customdata[2]}<extra></extra>"))
     fig.update_layout(polar=dict(radialaxis=dict(range=[0,100],tickvals=[25,50,75,100])),height=480,legend=dict(orientation="h"))
     return fig
