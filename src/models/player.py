@@ -28,9 +28,9 @@ def train(players,teams):
     return tasks
 
 
-def predict(players,teams,player_id,opponent_id,when,home):
+def predict(players,teams,player_id,opponent_id,when,home,bundle=None):
     from src.models.team import snapshot
-    bundle=load("player")
+    if bundle is None: bundle=load("player")
     cutoff=max(pd.Timestamp(t["inference_available_after"]) for t in bundle["tasks"].values())
     if pd.Timestamp(when)<=cutoff: raise ValueError("Use saved backtests before the model training cutoff")
     history=players[(players.player_id==player_id)&players.played&(players.date<pd.Timestamp(when))].sort_values(["date","game_id"])

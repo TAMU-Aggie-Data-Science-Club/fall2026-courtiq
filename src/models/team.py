@@ -83,9 +83,9 @@ def snapshot(teams,team_id,when,ratings):
     return row
 
 
-def predict(teams,home_id,away_id,when,spread=None):
+def predict(teams,home_id,away_id,when,spread=None,bundle=None):
     if home_id==away_id: raise ValueError("Choose different teams")
-    bundle=load("team")
+    if bundle is None: bundle=load("team")
     cutoff=max(pd.Timestamp(task["inference_available_after"]) for task in bundle["tasks"].values())
     if pd.Timestamp(when)<=cutoff: raise ValueError("Use saved backtests for dates before the model training cutoff")
     # Ship full-history pregame anchors so truncated app exports don't reset Elo.

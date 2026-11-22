@@ -9,3 +9,5 @@ if __name__ == "__main__":
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--start-season",type=int,default=2015)
     build(parser.parse_args().start_season)
+    from scripts.export_schedule import export_schedule
+    export_schedule()

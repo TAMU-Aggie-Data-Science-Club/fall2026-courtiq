@@ -33,6 +33,12 @@ METRIC_DETAILS = {
     "fg3a_pg": ("3PA per game", "Three-point attempts per appearance. Shows shot volume.", "three-point volume"),
     "ftr": ("Free-throw rate", "Free-throw attempts per 100 field-goal attempts.", "getting to the free-throw line"),
 }
+PLAYMAKING = {"assists_pg": "Assists / game", "assists_per36": "Assists / 36 minutes",
+              "ast_tov": "Assists per turnover", "points_pg": "Points / game"}
+METRIC_DETAILS.update({
+    "assists_per36": ("Assists /36", "Assists scaled to 36 minutes of playing time.", "assists per 36 minutes"),
+    "ast_tov": ("Assists per turnover", "Season assists divided by season turnovers.", "assists per turnover"),
+})
 DEFENSE_LENS = "Defense & Rebounding"
 DEFENSE = {
     "steals_per36": ("Steals /36", "Steals per 36 minutes of playing time.", "steal production"),
@@ -46,7 +52,8 @@ DEFENSE = {
 }
 METRIC_DETAILS.update(DEFENSE)
 LENSES = {"All-Around": ALL_AROUND, "Shooting": SHOOTING,
-          DEFENSE_LENS: {metric: details[0] for metric, details in DEFENSE.items()}}
+          DEFENSE_LENS: {metric: details[0] for metric, details in DEFENSE.items()},
+          "Playmaking": PLAYMAKING}
 RATE_METRICS = {"ts_pct", "efg_pct", "fg_pct", "fg2_pct", "fg3_pct", "ft_pct", "ftr", "team_dreb_share"}
 DEFENSE_COUNTS = {
     "steals_per36": "steals", "blocks_per36": "blocks", "dreb_per36": "dreb",
@@ -68,15 +75,15 @@ DEFENSIVE_BADGES = {
 
 def percentile_color(value):
     if pd.isna(value):
-        return "#64748b"
+        return "#697681"
     value = round(value)
     if value >= 85:
-        return "#0f766e"
+        return "#b54b1c"
     if value >= 50:
-        return "#2457a7"
+        return "#526e7e"
     if value >= 30:
-        return "#6366a1"
-    return "#805779"
+        return "#847052"
+    return "#9c6075"
 
 
 def percentile_label(value):
@@ -90,6 +97,8 @@ def percentile_label(value):
 def display_value(metric, value):
     if pd.isna(value):
         return "Unavailable"
+    if metric == "ast_tov":
+        return f"{value:.2f} per turnover"
     if metric == "ftr":
         return f"{value * 100:.1f} per 100 FGA"
     if metric in RATE_METRICS:
@@ -117,13 +126,13 @@ def ranking_status(metric, row, min_games=20):
 
 def canonical(frame):
     """Prefer TOT, otherwise require the sole team record; never silently double count."""
-    rows=[]
-    for _,g in frame.groupby(["player_id","season"],sort=False):
-        tot=g[g.team_id.eq(0)]
-        if len(tot)==1: rows.append(tot)
-        elif len(tot)==0 and len(g)==1: rows.append(g)
-        else: raise ValueError("Ambiguous combined player-season records")
-    return pd.concat(rows,ignore_index=True) if rows else frame.iloc[:0].copy()
+    groups = frame.groupby(["player_id", "season"], sort=False)
+    total = frame.team_id.eq(0)
+    selected = frame[total | groups.team_id.transform("size").eq(1)]
+    if len(selected) != groups.ngroups or selected.duplicated(["player_id", "season"]).any():
+        raise ValueError("Ambiguous combined player-season records")
+    return selected.reset_index(drop=True)
+
 
 
 def rankings(frame, season, lens="All-Around", min_games=20, min_mpg=15, directions=None):
@@ -234,7 +243,7 @@ def starting_position(row):
     return labels, f"Recorded starting positions ({total} starts): {counts}"
 
 
-def radar(breakdown, show_crowns=True, player_name="Selected player"):
+def radar(breakdown, color="#b54b1c", *, show_crowns=True, player_name="Selected player"):
     import plotly.graph_objects as go
     b=breakdown.reset_index(drop=True)
     if b.empty:
@@ -247,27 +256,28 @@ def radar(breakdown, show_crowns=True, player_name="Selected player"):
         crown = " 👑" if show_crowns and rank == 1 else ""
         placement = f"<b>{percentile_label(value)} pctile</b>" if pd.notna(value) else "Unranked"
         ticks.append(f"{title}{crown}<br>{placement}")
+    red, green, blue = bytes.fromhex(color.lstrip("#"))
     complete=all(pd.notna(v) for v in values)
     fig=go.Figure()
     fig.add_trace(go.Scatterpolar(r=[50]*(len(labels)+1),theta=labels+[labels[0]],
-        name="50th percentile",line=dict(color="#64748b",dash="dot"),hoverinfo="skip"))
+        name="50th percentile",line=dict(color="#697681",dash="dot"),hoverinfo="skip"))
     theta=labels+[labels[0]]
     r=values+[values[0]]
     custom = [[METRIC_DETAILS[row.metric][0], display_value(row.metric, row.value),
                f"{row['rank']:g}", row.population] for _, row in b.iterrows()]
     fig.add_trace(go.Scatterpolar(r=r,theta=theta,fill="toself" if complete else "none",
         connectgaps=False,mode="lines+markers",name=player_name,customdata=custom+[custom[0]],
-        line=dict(color="#2457a7",width=3),fillcolor="rgba(36,87,167,.16)",
+        line=dict(color=color,width=3),fillcolor=f"rgba({red},{green},{blue},.16)",
         marker=dict(color=[percentile_color(value) for value in r],size=9),
         hovertemplate="%{customdata[0]}<br>%{customdata[1]}<br>%{r:.0f} percentile<br>Rank %{customdata[2]} of %{customdata[3]}<extra></extra>"))
     fig.update_layout(
-        paper_bgcolor="#f5f8fc",
-        font=dict(color="#172e47"),
+        paper_bgcolor="#f3eee4",
+        font=dict(color="#202c36"),
         polar=dict(
-            bgcolor="#ffffff",
-            angularaxis=dict(tickmode="array",tickvals=labels,ticktext=ticks,gridcolor="#dbe5f0"),
+            bgcolor="#fffdf8",
+            angularaxis=dict(tickmode="array",tickvals=labels,ticktext=ticks,gridcolor="#e7ddce"),
             radialaxis=dict(range=[0,100],tickvals=[0,25,50,75,100],angle=22.5,
-                            tickfont=dict(color="#263f5a",size=12),gridcolor="#c7d5e4"),
+                            tickfont=dict(color="#384653",size=12),gridcolor="#d2c6b8"),
         ),
         height=440,margin=dict(l=90,r=90,t=45,b=65),
         legend=dict(orientation="h",x=.5,xanchor="center",y=-.16),

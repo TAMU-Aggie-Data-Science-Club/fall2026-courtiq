@@ -107,6 +107,8 @@ class RealTests(unittest.TestCase):
             return [item.value for item in at.markdown if item.value.endswith("scouting report**")]
 
         self.assertEqual(report_headings(), ["**All-around scouting report**"])
+        self.assertIn("Sources and how to read the rankings", [item.label for item in at.expander])
+        self.assertNotIn("Sources, definitions & limitations", [item.label for item in at.expander])
         latest = self.p.loc[self.p.played & self.p.season.eq(season), "date"].max()
         expected_date = f"Games included through {latest:%b} {latest.day}, {latest.year}"
         self.assertTrue(any(expected_date in item.value and "snapshot prepared" in item.value
@@ -133,6 +135,12 @@ class RealTests(unittest.TestCase):
         self.assertEqual(len(labels), 8)
         self.assertTrue(any("3PA per game" in label for label in labels))
         self.assertEqual(report_headings(), ["**Shooting scouting report**"])
+
+        at.button_group(key="scout_lens").set_value(["Playmaking"]).run()
+        playmaking_labels = radar()["layout"]["polar"]["angularaxis"]["ticktext"]
+        self.assertEqual(len(playmaking_labels), 4)
+        self.assertTrue(any("Assists per turnover" in label for label in playmaking_labels))
+        self.assertEqual(report_headings(), ["**Playmaking scouting report**"])
 
         at.selectbox(key="scout_team").set_value(0).run()
         ratings = pd.read_csv(APP / "scouting_ratings.csv.gz")
