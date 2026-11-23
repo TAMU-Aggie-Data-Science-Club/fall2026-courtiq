@@ -3,9 +3,10 @@ import unittest
 import numpy as np
 import pandas as pd
 from src.pipeline import season_fields,shooting,pregame,reliability,game_score,impact_table
-from src.features.scouting import canonical,rankings,report,radar
+from src.features.scouting import DEFENSE_LENS, canonical, defense_report, defensive_badges, rankings, report, radar, starting_position
 from src.features.breakout import target,season_features,training_transitions
 from src.models.common import cover_distribution
+from scripts.build_scouting_ratings import reconstruct
 
 
 class PipelineTests(unittest.TestCase):
@@ -65,6 +66,60 @@ class PipelineTests(unittest.TestCase):
 
 
 class ScoutingTests(unittest.TestCase):
+    def test_defensive_badge_thresholds_and_precedence(self):
+        metrics = ["steals_per36", "blocks_per36", "dreb_per36", "team_dreb_share", "oreb_per36"]
+        breakdown = pd.DataFrame({"metric": metrics, "percentile": [90, 90, 85, 85, 90]})
+        self.assertEqual(defensive_badges(breakdown), [
+            "Defensive Playmaker", "Glass Cleaner", "Second-Chance Creator",
+        ])
+        breakdown["percentile"] = [90, 84.9, 85, np.nan, 89.9]
+        self.assertEqual(defensive_badges(breakdown), ["Ball Hawk"])
+        breakdown["percentile"] = [84.9, 90, 85, 84.9, 89.9]
+        self.assertEqual(defensive_badges(breakdown), ["Shot Blocker"])
+        breakdown["percentile"] = [85, 85, 0, 0, 0]
+        self.assertEqual(defensive_badges(breakdown), ["Defensive Playmaker"])
+
+    def test_reconstructed_ratings_require_a_unique_possession_count(self):
+        games = pd.DataFrame({
+            "possessions": [60, 8], "offensiveRating": [126.7, 137.5],
+            "plusMinusPoints": [21, 11], "defensiveRating": [93.2, 0.0],
+            "netRating": [33.4, 137.5], "points": [19, 0],
+            "off_poss_max": [100, 100], "def_poss_max": [99, 99],
+            "teamScore": [122, 122], "opponentScore": [94, 94],
+        })
+        counts = reconstruct(games)
+        self.assertEqual(counts.iloc[0].to_dict(), {
+            "off_poss": 60, "off_points": 76, "def_poss": 59, "def_points": 55,
+        })
+        self.assertTrue(counts.iloc[1].isna().all())
+
+    def test_defensive_directions_and_missing_data(self):
+        frame = self.frame().assign(
+            minutes=[300, 400, 570], steals=[10, 20, 25], blocks=[5, 10, 15],
+            dreb=[60, 100, 110], oreb=[10, 15, 20], fouls=[10, 40, 20],
+            drtg=[112, 104, 90],
+        )
+        result = rankings(frame, "2025-26", DEFENSE_LENS)
+        player = result.query("player_id == 2").set_index("metric")
+        self.assertEqual(len(player), 8)
+        self.assertAlmostEqual(player.loc["dreb_per36", "value"], 9)
+        self.assertEqual(player.loc["drtg", "rank"], 1)
+        self.assertEqual(player.loc["fouls_per36", "rank"], 2)
+        self.assertTrue(pd.isna(player.loc["team_dreb_share", "percentile"]))
+        self.assertTrue(pd.isna(player.loc["netrtg", "percentile"]))
+        summary = defense_report(player.reset_index(), "Player Two")
+        self.assertIn("Foul avoidance is at the 50th percentile", summary)
+        labels = radar(player.reset_index()).layout.polar.angularaxis.ticktext
+        self.assertTrue(any("Defensive Rating 👑" in label for label in labels))
+        self.assertTrue(any("Foul Avoidance<br><b>50th pctile" in label for label in labels))
+
+    def test_starting_position_uses_recorded_starts(self):
+        self.assertEqual(starting_position({}), ("", ""))
+        self.assertEqual(starting_position({"guard_starts": 8, "forward_starts": 1})[0], "Guard")
+        label, detail = starting_position({"guard_starts": 3, "forward_starts": 9, "center_starts": 0})
+        self.assertEqual(label, "Forward / Guard")
+        self.assertIn("12 starts", detail)
+
     def frame(self):
         f=pd.DataFrame(dict(player_id=[1,2,3],team_id=[0]*3,season=["2025-26"]*3,
             games=[20,20,19],mpg=[15,20,30],fg3a=[50,49,100],fta=[50,50,50],
@@ -100,7 +155,10 @@ class ScoutingTests(unittest.TestCase):
         self.assertFalse(fig.data[1].connectgaps)
         badges,text=report(r)
         self.assertLessEqual(len(badges),3)
-        self.assertIn("Rankings",text)
+        self.assertIn("This player",text)
+        self.assertTrue(any("Unranked" in label for label in fig.layout.polar.angularaxis.ticktext))
+        self.assertTrue(any("👑" in label for label in fig.layout.polar.angularaxis.ticktext))
+        self.assertEqual(list(fig.layout.polar.radialaxis.tickvals), [0, 25, 50, 75, 100])
 
     def test_breakout_thresholds(self):
         self.assertTrue(target(20,5,15))
