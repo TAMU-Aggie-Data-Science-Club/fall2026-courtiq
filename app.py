@@ -6,7 +6,7 @@ from src import dashboard as ui
 
 st.set_page_config(page_title="CourtIQ",page_icon="🏀",layout="wide")
 st.markdown("""<style>
-.stMainBlockContainer{max-width:1180px;padding-top:2rem}
+.stMainBlockContainer{max-width:1180px;padding-top:3.75rem}
 h1,h2,h3{letter-spacing:-.035em}
 [data-testid="stSidebar"]{border-right:4px solid #ed8446}
 .court-brand{position:relative;overflow:hidden;background:#223541;border:1px solid #52606b;border-radius:14px;padding:22px 18px;color:#fff7ed}
@@ -19,10 +19,14 @@ h1,h2,h3{letter-spacing:-.035em}
 
 [data-testid="stMetric"]{border:1px solid #8794a455;border-radius:12px;padding:12px 16px}
 </style>""", unsafe_allow_html=True)
+st.html(ui.SHARED_STYLE)
 st.sidebar.markdown('<div class="court-brand"><strong>CourtIQ</strong><small>NBA scouting &amp; forecasts</small></div>',unsafe_allow_html=True)
 page = st.sidebar.radio("Explore", ["Players","Teams","Compare","Trends"],
-    format_func={"Players":"◎  Player scouting & impact","Teams":"◈  Team forecasts",
-                 "Compare":"⇄  Player matchups","Trends":"↗  Breakout watch"}.get)
+    format_func={"Players":"◎  Player Scouting & Impact","Teams":"◈  Team Forecasts",
+                 "Compare":"⇄  Player Matchups","Trends":"↗  Breakout Watch"}.get)
+st.sidebar.toggle("Dark mode", key="dark_mode", help="Switch the page, cards and charts to dark colors.")
+if ui.dark():
+    st.html(ui.DARK_STYLE)
 manifest_path=APP/"manifest.json"
 if not manifest_path.exists():
     st.info("Data is not prepared yet. Run python scripts/build_dataset.py, then python scripts/train_models.py.")

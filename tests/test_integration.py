@@ -193,26 +193,38 @@ class RealTests(unittest.TestCase):
         cached_team_forecast.clear()
         with patch("src.models.team.predict", wraps=team.predict) as predict:
             at.sidebar.radio[0].set_value("Teams").run()
-            self.assertEqual(at.radio(key="team_matchup_mode").value, "Upcoming games")
+            self.assertEqual(at.radio(key="team_matchup_mode").value, "Upcoming Games")
             if not any(picker.key == "team_upcoming_game" for picker in at.selectbox):
-                at.radio(key="team_matchup_mode").set_value("Past games").run()
+                at.radio(key="team_matchup_mode").set_value("Past Games").run()
             predict.assert_called_once()
             _, home, away, date, spread, _ = predict.call_args.args
         self.assertEqual(len(at.exception),0,str(at.exception))
         self.assertFalse(at.button)
-        if at.radio(key="team_matchup_mode").value == "Upcoming games":
+        if at.radio(key="team_matchup_mode").value == "Upcoming Games":
             self.assertFalse(any("Actual final" in item.value for item in at.markdown))
         scoreboard = next(item.proto.body for item in at.get("html") if 'class="forecast-scoreboard"' in item.proto.body)
         expected = team.predict(self.t, home, away, date, spread)
         for side in ("home", "away"):
             self.assertIn(f"{expected[f'{side}_score']:.1f}", scoreboard)
             self.assertIn(f"{expected[f'{side}_win']:.1%} win chance", scoreboard)
+        # Without a spread the margin section stays hidden; only the recent-form chart renders.
+        self.assertEqual(len(at.get("plotly_chart")), 1)
+        self.assertFalse(any("Projected margin" in item.value for item in at.markdown))
+        self.assertTrue(any("Include home spread" in item.value for item in at.caption))
+        at.toggle(key="team_use_spread").set_value(True).run()
+        self.assertFalse(at.exception)
+        self.assertTrue(any("Projected margin" in item.value for item in at.markdown))
         interval = json.loads(at.get("plotly_chart")[0].proto.spec)["data"][0]["x"]
-        self.assertEqual(interval, [expected["distribution"]["low"], expected["distribution"]["high"]])
+        with_spread = team.predict(self.t, home, away, date, -4.5)
+        self.assertEqual(interval, [with_spread["distribution"]["low"], with_spread["distribution"]["high"]])
         at.sidebar.radio[0].set_value("Compare").run()
-        at.button[0].click().run()
         self.assertEqual(len(at.exception),0,str(at.exception))
-        self.assertTrue(any("Recorded opposing-player encounters" in str(item.value) for item in at.markdown))
+        self.assertFalse(at.button)
+        cards = next(item.proto.body for item in at.get("html") if 'class="ciq-cards"' in item.proto.body)
+        self.assertEqual(cards.count('class="ciq-card"'), 2)
+        for label in ("PTS", "REB", "AST"):
+            self.assertEqual(cards.count(f"<b>{label}</b>"), 2)
+        self.assertTrue(any(item.value == "Past meetings" for item in at.subheader))
 
     def test_team_forecast_custom_spread_and_recent_window(self):
         from streamlit.testing.v1 import AppTest
@@ -220,7 +232,7 @@ class RealTests(unittest.TestCase):
 
         at = AppTest.from_file("app.py", default_timeout=40).run()
         at.sidebar.radio[0].set_value("Teams").run()
-        at.radio(key="team_matchup_mode").set_value("Custom matchup").run()
+        at.radio(key="team_matchup_mode").set_value("Custom Matchup").run()
         cutoff = max(pd.Timestamp(task["inference_available_after"]) for task in load("team")["tasks"].values())
         earliest = cutoff + pd.Timedelta(days=1)
         self.assertEqual(at.date_input(key="team_date").proto.min, f"{earliest:%Y/%m/%d}")
@@ -228,7 +240,7 @@ class RealTests(unittest.TestCase):
                             for item in at.caption))
         cached_team_forecast.clear()
         with patch("src.models.team.predict", wraps=team.predict) as predict:
-            next(widget for widget in at.checkbox if widget.label == "Include a home spread").check().run()
+            at.toggle(key="team_use_spread").set_value(True).run()
             at.number_input[0].set_value(-5.5).run()
             self.assertEqual(predict.call_count, 2)
             self.assertEqual(predict.call_args.args[4], -5.5)
@@ -278,13 +290,13 @@ class RealTests(unittest.TestCase):
         else:
             self.assertTrue(any("no upcoming games" in item.value for item in at.info))
 
-        at.radio(key="team_matchup_mode").set_value("Past games").run()
+        at.radio(key="team_matchup_mode").set_value("Past Games").run()
         self.assertEqual(at.selectbox(key="team_fixture_filter").value, team_id)
         if team_id:
             self.assertTrue(all(team_name in label for label in at.selectbox(key="team_past_game").options))
-            at.radio(key="team_matchup_mode").set_value("Upcoming games").run()
+            at.radio(key="team_matchup_mode").set_value("Upcoming Games").run()
             self.assertEqual(at.selectbox(key="team_fixture_filter").value, team_id)
-            at.radio(key="team_matchup_mode").set_value("Past games").run()
+            at.radio(key="team_matchup_mode").set_value("Past Games").run()
             at.selectbox(key="team_fixture_filter").set_value(0).run()
         day = self.t.date.max().date()
         at.selectbox(key="team_past_month").set_value(str(day)[:7]).run()
@@ -415,12 +427,12 @@ class RealTests(unittest.TestCase):
         self.assertTrue(any("Early-season comparisons" in item.value for item in app.warning))
         scatter = json.loads(app.get("plotly_chart")[-1].proto.spec)
         self.assertEqual(scatter["data"][-1]["name"], "Same margin")
-        self.assertEqual(len(app.dataframe), 1)
+        self.assertTrue(any('class="ciq-table"' in item.proto.body for item in app.get("html")))
 
         app.slider(key="impact_peer_minutes").set_value(2500).run()
         self.assertFalse(app.exception)
         self.assertTrue(any("reaches this minutes cutoff" in item.value for item in app.info))
-        self.assertFalse(app.dataframe)
+        self.assertFalse(any('class="ciq-table"' in item.proto.body for item in app.get("html")))
 
     def test_impact_trend_weights_by_minutes_and_rolls_off_old_games(self):
         from src.features.impact import rolling_margins
@@ -438,3 +450,96 @@ class RealTests(unittest.TestCase):
 
 
 if __name__=="__main__": unittest.main()
+
+
+class FeedbackTests(unittest.TestCase):
+    """Checks for the UI feedback pass: accuracy tables, readable tables, colors and dark mode."""
+    setUp = RealTests.setUp
+
+    def test_team_market_record_matches_saved_evaluation(self):
+        from src.dashboard import team_market_record
+
+        record = team_market_record(json.loads((APP / "manifest.json").read_text())["version"])
+        saved = load("team")["tasks"]["home_win"]
+        test = next(r for r in saved["results"] if r["period"] == "test")
+        self.assertEqual(record["n"], test["n"])
+        self.assertAlmostEqual(record["winner"], test["accuracy"])
+        margin = next(r for r in load("team")["tasks"]["margin"]["results"] if r["period"] == "test")
+        self.assertAlmostEqual(record["margin_mae"], margin["mae"])
+        for key in ("ats", "ou", "market_winner"):
+            self.assertTrue(0 < record[key] < 1, key)
+        self.assertGreater(record["ats_n"], 1000)
+        self.assertGreater(record["ou_n"], 1000)
+
+    def test_prop_stand_in_line_uses_only_earlier_games(self):
+        from src.dashboard import player_prop_record
+
+        version = json.loads((APP / "manifest.json").read_text())["version"]
+        record = player_prop_record(version)
+        self.assertEqual(set(record), {"points", "rebounds", "assists"})
+        for result in record.values():
+            self.assertTrue(.3 < result["rate"] < .8)
+            self.assertGreater(result["n"], 10000)
+
+    def test_stand_in_line_hand_computed(self):
+        from src.dashboard import stand_in_lines
+
+        games = pd.DataFrame({
+            "player_id": [1] * 12 + [1] * 6 + [2] * 6,
+            "season_start": [2025] * 12 + [2026] * 6 + [2025] * 6,
+            "points": list(range(1, 13)) + [50] * 6 + [7] * 6,
+        })
+        line = stand_in_lines(games, "points")
+        self.assertTrue(line.iloc[:5].isna().all())          # fewer than 5 earlier games
+        self.assertAlmostEqual(line.iloc[5], 3.0)            # mean of games 1-5, never game 6 itself
+        self.assertAlmostEqual(line.iloc[11], 6.5)           # mean of games 2-11 (last 10 only)
+        self.assertTrue(line.iloc[12:17].isna().all())       # new season starts over
+        self.assertAlmostEqual(line.iloc[17], 50.0)
+        self.assertAlmostEqual(line.iloc[23], 7.0)           # other player kept separate
+
+    def test_pair_colors_separate_similar_teams(self):
+        from src.dashboard import color_distance, pair_colors
+
+        teams = pd.read_csv(APP / "teams.csv.gz")
+        ids = teams.set_index("team_code").team_id
+        home, away = pair_colors(teams, ids["ATL"], ids["DET"])
+        self.assertGreaterEqual(color_distance(home, away), 12)
+        self.assertEqual(pair_colors(teams, ids["BOS"], ids["LAL"]), pair_colors(teams, ids["BOS"], ids["LAL"]))
+
+    def test_percentile_colors_are_distinct_for_color_blind_viewers(self):
+        from src.dashboard import color_distance
+        from src.features.scouting import percentile_color
+
+        steps = [percentile_color(value) for value in (90, 60, 40, 10)]
+        for first, second in zip(steps, steps[1:]):
+            self.assertGreaterEqual(color_distance(first, second), 12)
+
+    def test_every_page_renders_in_dark_mode(self):
+        from streamlit.testing.v1 import AppTest
+
+        for page in ["Players", "Teams", "Compare", "Trends"]:
+            at = AppTest.from_file("app.py", default_timeout=60).run()
+            at.sidebar.toggle(key="dark_mode").set_value(True).run()
+            at.sidebar.radio[0].set_value(page).run()
+            self.assertFalse(at.exception, page)
+            self.assertTrue(any("#121b22" in item.proto.body for item in at.get("html")), page)
+            for chart in at.get("plotly_chart"):
+                spec = json.loads(chart.proto.spec)
+                self.assertEqual(spec["layout"].get("paper_bgcolor"), "#121b22", page)
+        labels = [option for option in at.sidebar.radio[0].options]
+        self.assertTrue(any("Player Scouting & Impact" in label for label in labels))
+
+    def test_player_matchups_meeting_table_lists_both_players(self):
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file("app.py", default_timeout=60).run()
+        at.sidebar.radio[0].set_value("Compare").run()
+        self.assertFalse(at.exception)
+        tables = [item.proto.body for item in at.get("html") if 'class="ciq-table"' in item.proto.body]
+        meetings = next((body for body in tables if '<th class="group"' in body and ">PTS<" in body), None)
+        if meetings is not None:
+            away = at.selectbox(key="p_b").format_func(at.selectbox(key="p_b").value)
+            home = at.selectbox(key="p_a").format_func(at.selectbox(key="p_a").value)
+            self.assertIn(away, meetings)
+            self.assertIn(home, meetings)
+            self.assertEqual(meetings.count(">PTS<"), 2)

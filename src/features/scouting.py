@@ -77,13 +77,14 @@ def percentile_color(value):
     if pd.isna(value):
         return "#697681"
     value = round(value)
+    # Diverging orange (high) / blue (low) scale, checked for red-green color vision.
     if value >= 85:
-        return "#b54b1c"
+        return "#a8441a"
     if value >= 50:
-        return "#526e7e"
+        return "#e08b4f"
     if value >= 30:
-        return "#847052"
-    return "#9c6075"
+        return "#4d8fd6"
+    return "#1f5bab"
 
 
 def percentile_label(value):
