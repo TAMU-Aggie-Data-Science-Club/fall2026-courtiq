@@ -35,9 +35,10 @@ st.sidebar.divider()
 st.sidebar.caption("Historical box scores · Offline forecasts")
 if page=="Players":
     mode=st.radio("Player tools",["Scouting Lab","On/Off Impact"],horizontal=True)
-    if mode=="Scouting Lab": ui.scouting_page(ui.table("player_season",version),version,teams)
+    if mode=="Scouting Lab": ui.scouting_page(ui.table("player_season",version),teams,manifest)
     else: ui.impact_page(ui.table("on_off",version),teams)
 elif page=="Teams": ui.team_page(ui.table("team_games",version),teams,version)
 elif page=="Compare": ui.player_page(ui.table("player_games",version),ui.table("team_games",version),teams,version)
 else: ui.breakout_page(ui.table("player_season",version),version)
-ui.methodology(manifest)
+if page != "Players" or mode != "Scouting Lab":
+    ui.methodology(manifest)
