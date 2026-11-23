@@ -73,17 +73,165 @@ class RealTests(unittest.TestCase):
         next(widget for widget in at.radio if widget.label=="Player tools").set_value("On/Off Impact").run()
         self.assertEqual(len(at.exception),0,str(at.exception))
 
-    def test_prediction_buttons(self):
+    def test_team_forecast_renders_automatically_and_player_button_still_works(self):
         from streamlit.testing.v1 import AppTest
+        from src.dashboard import cached_team_forecast
+
         at=AppTest.from_file("app.py",default_timeout=60).run()
-        at.sidebar.radio[0].set_value("Teams").run()
-        at.button[0].click().run()
+        cached_team_forecast.clear()
+        with patch("src.models.team.predict", wraps=team.predict) as predict:
+            at.sidebar.radio[0].set_value("Teams").run()
+            self.assertEqual(at.radio(key="team_matchup_mode").value, "Upcoming games")
+            if not any(picker.key == "team_upcoming_game" for picker in at.selectbox):
+                at.radio(key="team_matchup_mode").set_value("Past games").run()
+            predict.assert_called_once()
+            _, home, away, date, spread, _ = predict.call_args.args
         self.assertEqual(len(at.exception),0,str(at.exception))
-        self.assertEqual(len(at.metric),4,"Prediction must actually render, not only show an error message")
+        self.assertFalse(at.button)
+        if at.radio(key="team_matchup_mode").value == "Upcoming games":
+            self.assertFalse(any("Actual final" in item.value for item in at.markdown))
+        scoreboard = next(item.proto.body for item in at.get("html") if 'class="forecast-scoreboard"' in item.proto.body)
+        expected = team.predict(self.t, home, away, date, spread)
+        for side in ("home", "away"):
+            self.assertIn(f"{expected[f'{side}_score']:.1f}", scoreboard)
+            self.assertIn(f"{expected[f'{side}_win']:.1%} win chance", scoreboard)
+        interval = json.loads(at.get("plotly_chart")[0].proto.spec)["data"][0]["x"]
+        self.assertEqual(interval, [expected["distribution"]["low"], expected["distribution"]["high"]])
         at.sidebar.radio[0].set_value("Compare").run()
         at.button[0].click().run()
         self.assertEqual(len(at.exception),0,str(at.exception))
         self.assertTrue(any("Recorded opposing-player encounters" in str(item.value) for item in at.markdown))
+
+    def test_team_forecast_custom_spread_and_recent_window(self):
+        from streamlit.testing.v1 import AppTest
+        from src.dashboard import cached_team_forecast
+
+        at = AppTest.from_file("app.py", default_timeout=40).run()
+        at.sidebar.radio[0].set_value("Teams").run()
+        at.radio(key="team_matchup_mode").set_value("Custom matchup").run()
+        cutoff = max(pd.Timestamp(task["inference_available_after"]) for task in load("team")["tasks"].values())
+        earliest = cutoff + pd.Timedelta(days=1)
+        self.assertEqual(at.date_input(key="team_date").proto.min, f"{earliest:%Y/%m/%d}")
+        self.assertTrue(any(f"Earliest forecast date: {earliest:%b} {earliest.day}, {earliest.year}" in item.value
+                            for item in at.caption))
+        cached_team_forecast.clear()
+        with patch("src.models.team.predict", wraps=team.predict) as predict:
+            next(widget for widget in at.checkbox if widget.label == "Include a home spread").check().run()
+            at.number_input[0].set_value(-5.5).run()
+            self.assertEqual(predict.call_count, 2)
+            self.assertEqual(predict.call_args.args[4], -5.5)
+            at.radio(key="team_recent_window").set_value(10).run()
+            self.assertEqual(predict.call_count, 2)
+            home = at.selectbox(key="team_home").value
+            away = at.selectbox(key="team_away").value
+            day = at.date_input(key="team_date").value
+            at.button(key="team_swap_sides").click().run()
+            self.assertEqual(at.selectbox(key="team_home").value, away)
+            self.assertEqual(at.selectbox(key="team_away").value, home)
+            self.assertEqual(predict.call_args.args[1:4], (away, home, day))
+        self.assertFalse(at.exception)
+        self.assertTrue(any("-5.5" in item.value and "Home covers" in item.value
+                            and "Away covers" in item.value for item in at.markdown))
+        recent = json.loads(at.get("plotly_chart")[-1].proto.spec)
+        self.assertTrue(all(len(trace["x"]) <= 10 for trace in recent["data"]))
+        self.assertTrue(all("Opponent" in trace["hovertemplate"] and "Final score" in trace["hovertemplate"]
+                            for trace in recent["data"]))
+        self.assertTrue(all(result.startswith(("W ", "L ")) for trace in recent["data"]
+                            for _, result in trace["customdata"]))
+        self.assertEqual(at.radio(key="team_recent_window").label, "Recent games per team")
+        cards = next(item.proto.body for item in at.get("html") if 'class="forecast-form-cards"' in item.proto.body)
+        self.assertEqual(cards.count("forecast-form-record"), 2)
+        self.assertIn("10 games", cards)
+
+    def test_team_forecast_matchup_finder(self):
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file("app.py", default_timeout=40).run()
+        at.sidebar.radio[0].set_value("Teams").run()
+        upcoming = [picker for picker in at.selectbox if picker.key == "team_upcoming_game"]
+        team_id = 0
+        if upcoming:
+            dates = {label.split(" · ", 1)[0] for label in upcoming[0].options}
+            self.assertLessEqual(len(dates), 3)
+            at.selectbox(key="team_upcoming_limit").set_value(7).run()
+            expanded = {label.split(" · ", 1)[0] for label in at.selectbox(key="team_upcoming_game").options}
+            self.assertTrue(dates.issubset(expanded))
+            self.assertLessEqual(len(expanded), 7)
+            team_filter = at.selectbox(key="team_fixture_filter")
+            team_name = team_filter.options[1]
+            lookup = pd.read_csv(APP / "teams.csv.gz").set_index("team_name").team_id
+            team_id = int(lookup[team_name])
+            team_filter.set_value(team_id).run()
+            self.assertTrue(all(team_name in label for label in at.selectbox(key="team_upcoming_game").options))
+        else:
+            self.assertTrue(any("no upcoming games" in item.value for item in at.info))
+
+        at.radio(key="team_matchup_mode").set_value("Past games").run()
+        self.assertEqual(at.selectbox(key="team_fixture_filter").value, team_id)
+        if team_id:
+            self.assertTrue(all(team_name in label for label in at.selectbox(key="team_past_game").options))
+            at.radio(key="team_matchup_mode").set_value("Upcoming games").run()
+            self.assertEqual(at.selectbox(key="team_fixture_filter").value, team_id)
+            at.radio(key="team_matchup_mode").set_value("Past games").run()
+            at.selectbox(key="team_fixture_filter").set_value(0).run()
+        day = self.t.date.max().date()
+        at.selectbox(key="team_past_month").set_value(str(day)[:7]).run()
+        self.assertFalse(any(picker.label == "Opponent" for picker in at.selectbox))
+        at.selectbox(key="team_past_date").set_value(day).run()
+        recorded = pd.read_csv(APP / "games.csv.gz", parse_dates=["date"])
+        dates_in_month = recorded.loc[
+            recorded.date.dt.strftime("%Y-%m").eq(str(day)[:7]) & recorded.date.le(pd.Timestamp(day))
+        ]
+        expected_days = dates_in_month.groupby(dates_in_month.date.dt.date).game_id.nunique()
+        self.assertCountEqual(at.selectbox(key="team_past_date").options, [
+            f"{date:%b} {date.day} · {count} {'game' if count == 1 else 'games'}"
+            for date, count in expected_days.items()
+        ])
+        self.assertTrue(at.selectbox(key="team_past_game").options)
+        self.assertFalse(at.exception)
+        self.assertTrue(any(item.value == "Historical forecast" for item in at.subheader))
+        game = recorded.set_index("game_id").loc[at.selectbox(key="team_past_game").value]
+        names = pd.read_csv(APP / "teams.csv.gz").set_index("team_id").team_name
+        home, away = names[game.home_team_id], names[game.away_team_id]
+        final = f"**Actual final** · {away} {game.away_points:.0f} · {home} {game.home_points:.0f}"
+        self.assertTrue(any(item.value == final for item in at.markdown))
+        forecast = team.predict(self.t, game.home_team_id, game.away_team_id, day)
+        home_chance, away_chance = [round(100 * forecast[f"{side}_win"], 1) for side in ("home", "away")]
+        if home_chance != away_chance:
+            favorite = home if home_chance > away_chance else away
+            winner = home if game.home_points > game.away_points else away
+            verdict = (f"{favorite}, the forecast favorite, won." if winner == favorite
+                       else f"{winner} won. The forecast favored {favorite}.")
+            self.assertTrue(any(item.value == verdict for item in at.caption))
+
+        self.assertNotIn("August 2025", at.selectbox(key="team_past_month").options)
+        old_day = recorded.loc[recorded.date.ge("2025-10-22"), "date"].min()
+        at.selectbox(key="team_past_month").set_value(old_day.strftime("%Y-%m")).run()
+        at.selectbox(key="team_past_date").set_value(old_day.date()).run()
+        slate = recorded.loc[recorded.date.eq(old_day)]
+        active = set(slate.home_team_id) | set(slate.away_team_id)
+        other_team = next(int(tid) for tid in recorded.home_team_id.unique() if tid not in active)
+        at.selectbox(key="team_fixture_filter").set_value(other_team).run()
+        last_team_game = recorded.loc[
+            recorded.home_team_id.eq(other_team) | recorded.away_team_id.eq(other_team), "date"
+        ].max()
+        self.assertEqual(at.selectbox(key="team_past_month").value, last_team_game.strftime("%Y-%m"))
+        self.assertEqual(at.selectbox(key="team_past_date").value, last_team_game.date())
+
+        home = recorded.loc[recorded.home_team_id.eq(other_team) & recorded.date.ge("2025-10-22")]
+        away = recorded.loc[recorded.away_team_id.eq(other_team) & recorded.date.ge("2025-10-22")]
+        opponent = int(sorted(set(home.away_team_id) & set(away.home_team_id))[0])
+        opponent_picker = at.selectbox(key=f"team_past_opponent_{other_team}")
+        self.assertEqual(opponent_picker.value, 0)
+        opponent_picker.set_value(opponent).run()
+        names = pd.read_csv(APP / "teams.csv.gz").set_index("team_id").team_name
+        meetings = pd.concat([home.loc[home.away_team_id.eq(opponent)],
+                              away.loc[away.home_team_id.eq(opponent)]])
+        for game in meetings.itertuples():
+            at.selectbox(key="team_past_month").set_value(game.date.strftime("%Y-%m")).run()
+            at.selectbox(key="team_past_date").set_value(game.date.date()).run()
+            self.assertEqual(at.selectbox(key="team_past_game").options,
+                             [f"{names[game.away_team_id]} at {names[game.home_team_id]}"])
 
     def test_impact_uses_selected_team_stint(self):
         from streamlit.testing.v1 import AppTest
