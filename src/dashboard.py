@@ -7,6 +7,7 @@ import plotly.express as px
 import streamlit as st
 from src.pipeline import APP
 from src.features import scouting,impact
+from src.features.breakout import season_features
 
 SOURCE_NBA="https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores"
 SOURCE_ODDS="https://www.kaggle.com/datasets/cviaxmiwnptr/nba-betting-data-october-2007-to-june-2024"
@@ -89,14 +90,33 @@ def choose(frame,key,label="Player"):
     return st.selectbox(label,list(names),format_func=names.get,key=key)
 
 
-def methodology(manifest):
-    with st.expander("Sources, definitions & limitations"):
-        st.markdown(f"[NBA box scores]({SOURCE_NBA}) · [Historical betting data]({SOURCE_ODDS}) · [The Odds API](https://the-odds-api.com/)")
-        st.write(f"Dataset version {manifest['version']}; built {manifest['built_at']}. Source coverage is the supplied download, not a live NBA feed.")
-        st.write("CourtIQ qualification: 20 played games & 15 minutes/game. Shooting percentiles need 50 attempts. Rankings use all eligible players in that season, not just the Top 50. Missing is not zero.")
-        st.write("Box scores do not identify guarding assignments, injuries or confirmed active rosters. On/off is observational and reflects teammates and opponents.")
-        st.write("2024-25 has source coverage omissions. Four current-season games lack duration/player-minute coverage; those values remain unavailable. DNP comparisons use only explicit rows.")
-        st.write("Historical line timing is unknown. Market comparisons are retrospective, not a demonstrated trading strategy. Predictions are educational statistical estimates; actual outcomes may differ.")
+def sources_and_limitations(route):
+    notes = {
+        "scouting-lab": [
+            "**Rankings** — Percentiles depend on who qualifies for that season and stat. Small samples can make rankings shift quickly.",
+            "**What box scores capture** — Steals and blocks describe part of a defender’s contribution. Defensive and net ratings also reflect teammates and opponents.",
+        ],
+        "on-off-impact": [
+            "**Game coverage** — The tool uses recorded minutes and scores. Games with missing duration or player minutes can reduce the sample for on/off comparisons.",
+            "**Interpreting impact** — Teammates, opponents, and rotations all influence the splits. The difference describes team results during those minutes.",
+        ],
+        "team-forecasts": [
+            "**Forecasts** — Estimates use earlier results in the available snapshot. Changes such as injuries and lineup decisions can affect the actual outcome.",
+            f"**Market lines** — The app displays cached lines when available. Timing is unknown for lines in the historical evaluation. [The Odds API](https://the-odds-api.com/) · [Historical betting data]({SOURCE_ODDS})",
+        ],
+        "player-matchups": [
+            "**Projections** — Estimates use recorded appearances. The snapshot cannot confirm future lineups, injuries, or who will guard whom.",
+            "**Past meetings** — A few games can be heavily influenced by minutes, role, or shooting variance. Treat them as context for the matchup.",
+        ],
+        "breakout-watch": [
+            "**Preseason forecasts** — Estimates use the prior completed season. The tracker uses newer games as they become available in the snapshot.",
+            "**Early-season rankings** — A smaller sample and a changing comparison group can make provisional percentiles swing.",
+            "**Historical test** — The season shown in the backtest is a single evaluation of how the watchlist performed.",
+        ],
+    }
+    with st.expander("Sources & limitations"):
+        source = f"**NBA box scores** — This page uses the game and player records available in the app’s data snapshot. [Historical NBA box scores]({SOURCE_NBA})"
+        st.markdown("\n".join(f"- {item}" for item in [source, *notes[route]]))
 
 
 def scouting_page(seasons,version,teams):
@@ -356,7 +376,6 @@ def impact_page(impacts, teams, manifest):
 - **On/Off difference** — The on-court margin minus the bench margin. Both groups use games the player appeared in with usable minutes and scoring data.
 - **Sample size** — Limited means under 500 minutes on court or under 250 on the bench, or minutes are unavailable. Large means at least 1,500 on court and 500 on the bench. Everything in between is Moderate.
 - **Trend** — Each point uses up to 10 recent appearances for the selected team. It starts after five usable games. A missing line means there were no usable minutes for that side of the comparison.
-- **What to take away** — These comparisons describe team results in the minutes and games covered. Rotations, teammates, and opponents all influence them. [Historical NBA box scores]({SOURCE_NBA})
             """
         )
 
@@ -770,7 +789,6 @@ def team_page(t, teams, version):
 - **80% margin range** — An approximate range based on past forecast errors. The wider the range, the more room there is for a different result.
 - **Recent form** — Each dot is one game. Point margin is points scored minus points allowed.
 - **Spread** — Home covers when its final margin plus the signed home spread is positive. A push means that adjusted margin is zero.
-- **Coverage** — Forecasts use earlier games from the available snapshot. [Historical NBA box scores]({SOURCE_NBA})
             """
         )
         if result is not None:
@@ -1008,35 +1026,339 @@ def player_page(p, t, teams, version):
 - **Projected PTS, REB, and AST** — Estimated points, rebounds, and assists for each player against the opposing team.
 - **Recent average** — Up to 10 earlier played games in the same season. When none are available for a stat, the comparison uses the training average.
 - **80% range** — An approximate set of outcomes based on historical forecast errors. Players can finish outside it.
-- **Past meetings** — Games in this snapshot before the selected date where both players appeared for opposing teams. The box scores show each player's team and individual result. [Historical NBA box scores]({SOURCE_NBA})
+- **Past meetings** — Games in this snapshot before the selected date where both players appeared for opposing teams. The box scores show each player's team and individual result.
             """
         )
 
 
-def breakout_page(seasons,version):
-    st.header("Breakout Watch")
-    path=APP/"breakout_candidates.csv.gz"
-    if not path.exists(): st.info("Breakout model not prepared. Run the offline training command."); return
-    f=table("breakout_candidates",version)
-    st.caption("Preseason estimates from the latest completed season. Rookies excluded. Probabilities are model estimates, not guarantees.")
-    st.caption("Explore the highest preseason estimates, then select a player to track their minutes and production.")
-    leaders=f.nlargest(10,"probability").sort_values("probability")
-    chart=px.bar(leaders,x="probability",y="player_name",orientation="h",labels={"probability":"Estimated breakout chance","player_name":"Player"},color_discrete_sequence=["#de793c"])
-    chart.update_xaxes(tickformat=".0%")
-    st.plotly_chart(chart,use_container_width=True)
-    pid=choose(f,"breakout_player")
-    if pid is not None:
-        selected=f[f.player_id.eq(pid)].iloc[0]
-        st.metric(f"{selected.player_name} · Estimated breakout chance",f"{selected.probability:.0%}")
-        hist=scouting.canonical(seasons)
-        hist=hist[hist.player_id.eq(pid)].sort_values("season_start")
-        st.plotly_chart(px.line(hist.rename(columns={"mpg":"Minutes per game","pra_per36":"Points + rebounds + assists per 36 minutes"}),x="season",y=["Minutes per game","Points + rebounds + assists per 36 minutes"],markers=True,labels={"variable":"Measure","value":"Season average","season":"Season"}),use_container_width=True)
-        st.caption("Current-season observations are a separate tracker, not inputs retroactively added to the preseason forecast.")
+@st.cache_data(show_spinner=False)
+def breakout_history(seasons):
+    return season_features(seasons)
 
-    st.write("A breakout here means playing at least 20 minutes per game next season, gaining at least five minutes per game, and climbing 15 percentile points in combined points, rebounds and assists per 36 minutes.")
+
+def breakout_progress_chart(history, metric, label, color, target=None):
+    chart = px.line(
+        history, x="season", y=metric, markers=True, custom_data=["games"],
+        labels={"season": "Season", metric: label}, color_discrete_sequence=[color],
+    )
+    chart.update_traces(
+        connectgaps=False,
+        hovertemplate=f"%{{x}}<br>{label} %{{y:.1f}}<br>%{{customdata[0]}} games played<extra></extra>",
+    )
+    if target is not None:
+        chart.add_hline(y=target, line_dash="dash", line_color=color)
+    chart.update_layout(height=285, margin=dict(l=8, r=12, t=12, b=8))
+    chart.update_xaxes(title=None, type="category")
+    chart.update_yaxes(range=[0, 100] if metric == "pra_pctl" else None, rangemode="tozero")
+    st.plotly_chart(chart, use_container_width=True)
+
+
+BREAKOUT_CARD_STYLE = """
+<style>
+.breakout-panel {border:1px solid #8794a455;border-radius:.7rem;overflow:hidden;}
+.breakout-targets {display:grid;gap:0 1rem;padding:.85rem 1rem;}
+.breakout-target {min-width:0;}
+.breakout-target h4 {font-size:1.08rem;margin:0;border-bottom:3px solid var(--accent);padding:.25rem 0 .55rem;}
+.breakout-row {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.5rem;
+    align-items:baseline;padding:.55rem 0;border-bottom:1px solid #8794a433;}
+.breakout-row small {font-size:.85rem;}
+.breakout-current strong {font-size:1.35rem;line-height:1.2;}
+.breakout-status {font-size:.9rem;}
+.breakout-qualification {display:grid;gap:.25rem;padding:.5rem 1rem;font-size:.85rem;}
+.breakout-qualification ul {display:flex;flex-wrap:wrap;gap:.25rem 1rem;list-style:none;margin:0;padding:0;}
+.breakout-check {font-weight:700;}
+.breakout-check.met {color:#168458;}
+.breakout-raw {display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem .75rem;
+    background:color-mix(in srgb,#168458 8%,transparent);padding:.75rem 1rem;}
+.breakout-raw strong {font-size:1.12rem;}
+@media(min-width:641px) {
+    .breakout-targets {grid-template-columns:repeat(2,minmax(0,1fr));}
+    .breakout-target {display:contents;}
+    .breakout-target > * {grid-column:var(--track);}
+    .breakout-target > :nth-child(1) {grid-row:1;}
+    .breakout-target > :nth-child(2) {grid-row:2;}
+    .breakout-target > :nth-child(3) {grid-row:3;}
+    .breakout-target > :nth-child(4) {grid-row:4;}
+    .breakout-target > :nth-child(5) {grid-row:5;}
+}
+@media(max-width:640px) {.breakout-target + .breakout-target {margin-top:.8rem;}}
+</style>
+"""
+
+
+def breakout_progress_column(title, track, color, baseline, current, target, unit, in_progress, pending,
+                             provisional=False):
+    from html import escape
+
+    current_value = f"{current:.2f}" if pd.notna(current) else "Unavailable"
+    if pd.isna(current):
+        status = pending
+    elif current >= target:
+        status = "At or above target so far" if in_progress else "Target met"
+    else:
+        gap = target - current
+        distance = f"{gap:.2f}" if gap >= 0.01 else "Less than 0.01"
+        gap_unit = "percentile points" if unit == "league percentile" else unit
+        status = f"{distance} {gap_unit} to go" if in_progress else f"Finished {distance.lower()} {gap_unit} short"
+    return f"""
+    <article class="breakout-target" style="--accent:{color};--track:{track}">
+        <h4>{escape(title)} <small>· {escape(unit)}</small></h4>
+        <div class="breakout-row breakout-current"><small>This season{" · provisional" if provisional else ""}</small><strong>{current_value}</strong></div>
+        <div class="breakout-row"><small>Last season</small><strong>{baseline:.2f}</strong></div>
+        <div class="breakout-row"><small>Target</small><strong>{target:.2f}</strong></div>
+        <div class="breakout-row breakout-status"><small>Progress</small><strong>{escape(status)}</strong></div>
+    </article>
+    """
+
+
+def breakout_chance_label(probability):
+    if probability < 0.001:
+        return "<0.1%"
+    if probability < 0.10:
+        return f"{probability:.1%}"
+    return f"{probability:.0%}"
+
+
+def breakout_test_results(cohort, history):
+    for outcome_start, season_test in cohort.groupby("season_start", sort=False):
+        outcome_start = int(outcome_start)
+        outcome = f"{outcome_start}-{(outcome_start + 1) % 100:02d}"
+        baseline = f"{outcome_start - 1}-{outcome_start % 100:02d}"
+        ranked = season_test.sort_values("prediction", ascending=False, kind="stable")
+        ranked = ranked.assign(rank=range(1, len(ranked) + 1))
+        top = ranked.head(15)
+        heading(f"How the model did in {outcome}", "#3675a2")
+        st.write(
+            f"We ranked players using their {baseline} stats, then checked who met all three "
+            f"breakout criteria in {outcome}."
+        )
+        leaders_score, cohort_score = st.columns(2)
+        leaders_score.metric(f"Broke out among the top {len(top)} predictions", f"{int(top.actual.sum())} of {len(top)}")
+        cohort_score.metric("Breakout rate across all players in the test", f"{ranked.actual.mean():.1%}")
+        st.caption(f"{int(ranked.actual.sum())} of {len(ranked)} players in the test broke out.")
+
+        fields = ["player_id", "season_start", "player_name", "mpg", "pra_pctl"]
+        before = history.loc[history.season_start.eq(outcome_start - 1), fields]
+        after = history.loc[history.season_start.eq(outcome_start), fields]
+        hits = ranked.loc[ranked.actual.eq(1)].merge(
+            before.drop(columns="season_start"), on="player_id", how="left", validate="one_to_one",
+        ).merge(
+            after.drop(columns="season_start"), on="player_id", how="left",
+            suffixes=("_before", "_after"), validate="one_to_one",
+        )
+
+        def change(before_value, after_value, suffix=""):
+            if pd.isna(before_value) or pd.isna(after_value):
+                return "Unavailable"
+            return f"{before_value:.1f} → {after_value:.1f} ({after_value - before_value:+.1f}{suffix})"
+
+        rows = pd.DataFrame({
+            "Preseason Rank": hits["rank"],
+            "Player": hits.player_name_after.fillna(hits.player_name_before).fillna(hits.player_id.map("Player {}".format)),
+            "Minutes per Game": [change(a, b) for a, b in zip(hits.mpg_before, hits.mpg_after)],
+            "Production Percentile": [change(a, b, " pts") for a, b in zip(hits.pra_pctl_before, hits.pra_pctl_after)],
+            "Predicted Breakout Chance": hits.prediction.map(breakout_chance_label),
+        })
+        st.markdown(f"**Who broke out among the top {len(top)} predictions?**")
+        top_hits = rows.loc[rows["Preseason Rank"].le(len(top))]
+        if top_hits.empty:
+            st.write("None of the top predictions met all three breakout criteria.")
+        else:
+            st.dataframe(top_hits, hide_index=True, use_container_width=True)
+        if not rows.empty:
+            st.caption(f"Each row shows {baseline} → {outcome}, with the change in parentheses. Rank is within the test group.")
+            with st.expander(f"See all {len(rows)} players who broke out in {outcome}"):
+                st.dataframe(rows, hide_index=True, use_container_width=True)
+
+
+def breakout_page(seasons, version):
+    st.markdown(FORECAST_STYLE, unsafe_allow_html=True)
+    st.header("Breakout Watch")
+    st.write("Find players projected to earn a bigger role and improve their production, then follow their progress through the forecast season.")
+    if not (APP / "breakout_candidates.csv.gz").exists():
+        st.info("Breakout forecasts are unavailable until the model has been prepared.")
+        return
+    candidates = table("breakout_candidates", version).sort_values(
+        ["probability", "player_name"], ascending=[False, True],
+    ).reset_index(drop=True)
+    if candidates.empty:
+        st.info("No breakout candidates are available.")
+        return
+
+    baseline_start = int(candidates.iloc[0].season_start)
+    forecast_start = baseline_start + 1
+    forecast_season = f"{forecast_start}-{(forecast_start + 1) % 100:02d}"
+    baseline_season = candidates.iloc[0].season
+    latest_completed = json.loads((APP / "manifest.json").read_text())["latest_completed_start"]
+    st.caption(f"{forecast_season} preseason forecast · Based on the completed {baseline_season} season")
+    with st.container(border=True):
+        st.markdown("**What counts as a breakout? A player must hit all three marks.**")
+        st.markdown(
+            "- Average **at least 20 minutes per game**.\n"
+            "- Add **at least 5 minutes per game** compared with the prior season.\n"
+            "- Gain **at least 15 percentile points** in combined points, rebounds, and assists per 36 minutes."
+        )
+        st.caption("Production percentiles compare players in the same season with at least 20 games played and 15 minutes per game.")
+
+    heading("Preseason watchlist", "#bd652e")
+    pid = choose(candidates, "breakout_player", "Search for a candidate")
+    selected = candidates.loc[candidates.player_id.eq(pid)].iloc[0]
+    chance_label = breakout_chance_label(selected.probability)
+    leaders = candidates.head(10).copy()
+    leaders["label"] = [f"{i + 1}. {name}" for i, name in leaders.player_name.items()]
+    leaders["chance_label"] = leaders.probability.map(breakout_chance_label)
+    chart = px.bar(
+        leaders, x="probability", y="label", orientation="h", text="chance_label",
+        labels={"probability": "Estimated breakout chance", "label": "Player"},
+    )
+    chart.update_traces(
+        marker_color=["#bd652e" if player == pid else "#637e90" for player in leaders.player_id],
+        textposition="outside", cliponaxis=False,
+        hovertemplate="%{y}<br>Estimated chance %{text}<extra></extra>",
+    )
+    chart.update_xaxes(tickformat=".0%", range=[0, 1])
+    chart.update_yaxes(autorange="reversed", title=None)
+    chart.update_layout(height=365, margin=dict(l=8, r=38, t=8, b=8))
+    st.plotly_chart(chart, use_container_width=True)
+    st.caption("The chart shows the top 10. Search covers all candidates. Eligibility requires 20 games, 15 minutes per game, and a production percentile below 80 in the prior season. Incoming rookies have no NBA baseline.")
+
+    heading(selected.player_name, "#bd652e")
+    with st.container(border=True):
+        st.metric("Preseason forecast · Breakout chance", chance_label,
+                  delta=f"Rank {selected.name + 1} of {len(candidates)}", delta_color="off")
+        chance_phrase = "less than a **0.1% chance**" if chance_label == "<0.1%" else f"a **{chance_label} chance**"
+        st.write(
+            f"The model estimates {chance_phrase} that {selected.player_name} "
+            f"meets both the playing-time and production targets by the end of {forecast_season}."
+        )
+    st.write(
+        f"{selected.player_name} averaged **{selected.pra_per36:.1f} combined points, rebounds, and assists "
+        f"per 36 minutes** across **{int(selected.games)} games** in {baseline_season}."
+    )
+    if pd.notna(selected.mpg_change) and abs(selected.mpg_change) >= 0.1:
+        direction = "up" if selected.mpg_change > 0 else "down"
+        st.caption(f"Playing time was {direction} {abs(selected.mpg_change):.1f} minutes per game from the season before.")
+
+    heading(f"{forecast_season} season progress", "#3675a2")
+    games = table("player_games", version)
+    through = games.loc[
+        games.season_start.eq(forecast_start) & games.played.eq(1) & games.minutes.gt(0), "date"
+    ].max()
+    if pd.notna(through):
+        st.caption(f"League box scores through {through:%b} {through.day}, {through.year}")
+    all_history = breakout_history(seasons)
+    in_progress = forecast_start > latest_completed
+    season_players = all_history.loc[all_history.season_start.eq(forecast_start)]
+    min_games = 20
+    if in_progress and not season_players.empty:
+        team_games = table("team_games", version)
+        counts = team_games.loc[team_games.season.eq(forecast_season)].groupby("team_id").game_id.nunique()
+        if counts.reindex(table("teams", version).team_id, fill_value=0).lt(20).any():
+            min_games = 5
+    provisional = min_games < 20
+    if provisional:
+        eligible = season_players.games.ge(min_games) & season_players.mpg.ge(15)
+        tracker_ranks = season_players.pra_per36.where(eligible).rank(method="average", pct=True) * 100
+        st.info(
+            f"**Early-season production rank.** For now, the minimum is {min_games} games played and 15 MPG "
+            f"({tracker_ranks.count()} qualifying players). Percentiles can shift substantially as more "
+            "games are played and more players qualify. The standard 20-game minimum returns once every "
+            "team has 20 recorded games."
+        )
+    history = all_history.loc[all_history.player_id.eq(pid) & all_history.season_start.le(forecast_start)].copy()
+    if provisional:
+        current_season = history.season_start.eq(forecast_start)
+        history.loc[current_season, "pra_pctl"] = tracker_ranks.reindex(history.index[current_season])
+    forecast_row = history.loc[history.season_start.eq(forecast_start)]
+    if forecast_row.empty:
+        st.info("No games for this player are available in the forecast season.")
+    elif in_progress:
+        st.info(f"In progress · {int(forecast_row.iloc[0].games)} games played in the available data. Averages and league percentiles can shift as more games are played.")
+    st.caption("Dashed lines show the player's individual breakout targets. The preseason estimate stays fixed.")
+
+    minutes_target = max(20, selected.mpg + 5)
+    percentile_target = selected.pra_pctl + 15
+    current = forecast_row.iloc[0] if not forecast_row.empty else None
+    pending = "No forecast-season stats available."
+    qualification = ""
+    if current is not None:
+        pending = "Qualification pending" if in_progress else "Percentile unavailable"
+        requirements = [
+            (current.games >= min_games, f"{int(current.games)} of {min_games} games played"
+             if current.games < min_games else f"At least {min_games} games played"),
+            (current.mpg >= 15, "At least 15 MPG"),
+        ]
+        items = []
+        for met, label in requirements:
+            icon, state = ("✓", "Met") if met else ("○", "Not met")
+            style = " met" if met else ""
+            items.append(f'<li><span class="breakout-check{style}" role="img" aria-label="{state}">{icon}</span> {label}</li>')
+        qualification = f'<div class="breakout-qualification"><strong>Production rank requirements</strong><ul>{"".join(items)}</ul></div>'
+        if current.mpg >= minutes_target:
+            playing_time = "is at or above the playing-time target" if in_progress else "met the playing-time target"
+        else:
+            gap = minutes_target - current.mpg
+            distance = f"{gap:.2f} MPG" if gap >= 0.01 else "less than 0.01 MPG"
+            playing_time = f"is {distance} short of the playing-time target" if in_progress else f"finished {distance} short of the playing-time target"
+        if pd.isna(current.pra_pctl):
+            production = "the production rank is still pending" if in_progress else "the final production rank was unavailable"
+        else:
+            position = "at or above" if current.pra_pctl >= percentile_target else "below"
+            rank_type = "provisional production rank" if provisional else "production rank"
+            production = f"the {rank_type} is {position} the production target"
+        st.markdown(f"**Progress at a glance.** {selected.player_name} {playing_time}, and {production}.")
+    else:
+        st.markdown(f"**Progress at a glance.** There are no recorded {forecast_season} games for {selected.player_name} yet.")
+    minutes_column = breakout_progress_column(
+        "Playing time", 1, "#3675a2", selected.mpg,
+        current.mpg if current is not None else float("nan"), minutes_target, "MPG",
+        in_progress, "No forecast-season minutes available.",
+    )
+    production_column = breakout_progress_column(
+        "Production rank", 2, "#168458", selected.pra_pctl,
+        current.pra_pctl if current is not None else float("nan"), percentile_target,
+        "league percentile", in_progress, pending,
+        provisional=provisional,
+    )
+    raw_production = (
+        f"{current.pra_per36:.1f}"
+        if current is not None and pd.notna(current.pra_per36) else "Unavailable"
+    )
+    st.html(f"""
+        {BREAKOUT_CARD_STYLE}
+        <section class="breakout-panel" aria-label="Breakout progress">
+            <div class="breakout-targets">{minutes_column}{production_column}</div>
+            {qualification}
+            <div class="breakout-raw"><span>Production per 36 min this season</span>
+                <strong>{raw_production}</strong><small>Points + rebounds + assists</small>
+            </div>
+        </section>
+    """)
+    if provisional:
+        st.caption("This season’s production percentile uses a 5-game minimum. Last season’s baseline and the official breakout criteria use 20 games.")
+    st.caption("The playing-time target covers both requirements: 20 MPG or more and an increase of at least 5 MPG over last season.")
+    st.markdown(f"**Minutes per game · Target {minutes_target:.2f}**")
+    breakout_progress_chart(history, "mpg", "Minutes per game", "#3675a2", minutes_target)
+    chart_title = "Production percentile (current season provisional)" if provisional else "Production percentile"
+    st.markdown(f"**{chart_title} · Target {percentile_target:.2f}**")
+    breakout_progress_chart(history, "pra_pctl", "Production percentile", "#168458", percentile_target)
+    st.caption("Production rank compares combined points, rebounds, and assists per 36 minutes with eligible players in the same season. The standard ranking requires at least 20 games played and 15 MPG.")
+    with st.expander("See production per 36 minutes"):
+        st.caption("Combined points, rebounds, and assists per 36 minutes. This view also shows seasons when the player has too few games to earn a percentile.")
+        breakout_progress_chart(history, "pra_per36", "Points + rebounds + assists per 36", "#168458")
+
+    if (APP / "backtest_breakout_breakout.csv.gz").exists():
+        cohort = table("backtest_breakout_breakout", version).query("period == 'test'")
+        breakout_test_results(cohort, all_history)
     performance("breakout")
-    back=APP/"backtest_breakout_breakout.csv.gz"
-    if back.exists():
-        st.subheader("Held-out candidate backtest")
-        cohort=table("backtest_breakout_breakout",version).query("period == 'test'").nlargest(15,"prediction")
-        st.write(f"{int(cohort.actual.sum())} of the model’s 15 highest-ranked candidates met the breakout definition.")
+    with st.expander("How to read Breakout Watch"):
+        st.markdown(
+            f"""
+- **Preseason chance** — The model estimates the chance of meeting all three breakout marks by season’s end. It uses the prior completed season’s stats and stays fixed as new games are added.
+- **Who makes the watchlist** — Players with at least 20 games, at least 15 minutes per game, and a production percentile below 80 in the prior season. Incoming rookies have no NBA baseline.
+- **Playing time** — Minutes per game counts games the player appeared in. The individual target is whichever is higher: 20 MPG or their prior-season average plus 5 MPG.
+- **Production per 36** — Points, rebounds, and assists added together and scaled to 36 minutes. The **production percentile** ranks that rate against eligible players in the same season. The breakout target is a gain of at least 15 percentile points.
+- **Early-season rankings** — The tracker can show provisional percentiles for players with 5 games and 15 MPG. It returns to the 20-game minimum once every team has 20 recorded games. Early ranks can move as players log more games and the comparison group grows.
+- **Historical test** — The backtest ranks players using prior-season data, then checks who met all three criteria in a season held back from training. The top 15 are part of the full test group.
+            """
+        )

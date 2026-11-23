@@ -73,6 +73,35 @@ class RealTests(unittest.TestCase):
         next(widget for widget in at.radio if widget.label=="Player tools").set_value("On/Off Impact").run()
         self.assertEqual(len(at.exception),0,str(at.exception))
 
+    def test_page_links_restore_navigation_in_new_session(self):
+        from streamlit.testing.v1 import AppTest
+
+        pages = {
+            "scouting-lab": "Player Scouting Lab",
+            "on-off-impact": "On/Off Impact",
+            "team-forecasts": "Team Forecasts",
+            "player-matchups": "Player Matchup Lab",
+            "breakout-watch": "Breakout Watch",
+        }
+        for slug, title in pages.items():
+            with self.subTest(page=slug):
+                app = AppTest.from_file("app.py", default_timeout=40)
+                app.query_params["page"] = slug
+                app.run()
+                self.assertFalse(app.exception)
+                self.assertTrue(any(header.value == title for header in app.header))
+
+        app = AppTest.from_file("app.py", default_timeout=40)
+        app.query_params["page"] = "unknown"
+        app.query_params["ref"] = "test"
+        app.run()
+        self.assertEqual(app.query_params["page"], ["scouting-lab"])
+        app.radio(key="nav_player_tool").set_value("On/Off Impact").run()
+        self.assertEqual(app.query_params["page"], ["on-off-impact"])
+        app.sidebar.radio(key="nav_section").set_value("Compare").run()
+        self.assertEqual(app.query_params["page"], ["player-matchups"])
+        self.assertEqual(app.query_params["ref"], ["test"])
+
     def test_team_forecast_renders_automatically(self):
         from streamlit.testing.v1 import AppTest
         from src.dashboard import cached_team_forecast
