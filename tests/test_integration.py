@@ -73,7 +73,7 @@ class RealTests(unittest.TestCase):
         next(widget for widget in at.radio if widget.label=="Player tools").set_value("On/Off Impact").run()
         self.assertEqual(len(at.exception),0,str(at.exception))
 
-    def test_team_forecast_renders_automatically_and_player_button_still_works(self):
+    def test_team_forecast_renders_automatically(self):
         from streamlit.testing.v1 import AppTest
         from src.dashboard import cached_team_forecast
 
@@ -97,10 +97,90 @@ class RealTests(unittest.TestCase):
             self.assertIn(f"{expected[f'{side}_win']:.1%} win chance", scoreboard)
         interval = json.loads(at.get("plotly_chart")[0].proto.spec)["data"][0]["x"]
         self.assertEqual(interval, [expected["distribution"]["low"], expected["distribution"]["high"]])
-        at.sidebar.radio[0].set_value("Compare").run()
-        at.button[0].click().run()
-        self.assertEqual(len(at.exception),0,str(at.exception))
-        self.assertTrue(any("Recorded opposing-player encounters" in str(item.value) for item in at.markdown))
+
+    def test_player_matchup_automatic_projections_and_both_meeting_lines(self):
+        from streamlit.testing.v1 import AppTest
+
+        app = AppTest.from_file("app.py", default_timeout=40).run()
+        app.sidebar.radio[0].set_value("Compare").run()
+        self.assertEqual(app.radio(key="player_matchup_mode").value, "Upcoming games")
+        app.session_state["player_past_game"] = 22500288
+        app.radio(key="player_matchup_mode").set_value("Past games").run()
+        self.assertFalse(app.exception)
+        self.assertNotEqual(app.selectbox(key="player_past_game").value, 22500288)
+        if (APP / "schedule.csv.gz").exists():
+            app.session_state["player_upcoming_game"] = 22500288
+            app.radio(key="player_matchup_mode").set_value("Upcoming games").run()
+            self.assertFalse(app.exception)
+            for picker in app.selectbox:
+                if picker.key == "player_upcoming_game":
+                    self.assertNotEqual(picker.value, 22500288)
+        app.radio(key="player_matchup_mode").set_value("Custom matchup").run()
+
+        roster = self.p.loc[self.p.played].sort_values(["date", "game_id"]).drop_duplicates("player_id", keep="last")
+        away_name, home_name = "Luka Doncic", "Victor Wembanyama"
+        away = roster.loc[roster.player_name.eq(away_name)].iloc[0]
+        home = roster.loc[roster.player_name.eq(home_name)].iloc[0]
+        app.selectbox(key="player_home").set_value(int(home.team_id)).run()
+        app.selectbox(key="player_away").set_value(int(away.team_id)).run()
+        app.selectbox(key="p_b").set_value(int(away.player_id)).run()
+        app.selectbox(key="p_a").set_value(int(home.player_id)).run()
+        self.assertFalse(app.exception)
+        self.assertFalse(any("predict" in item.label.lower() for item in app.button))
+
+        cards = next(item.proto.body for item in app.get("html") if "player-forecast-cards" in item.proto.body)
+        selected_date = app.date_input(key="player_date").value
+        forecast, _ = player.predict(self.p, self.t, away.player_id, home.team_id, selected_date, False)
+        for stat in forecast.itertuples():
+            self.assertIn(f"{stat.prediction:.1f}</strong>", cards)
+            self.assertIn(f"80% range {stat.low:.1f}–{stat.high:.1f}", cards)
+        self.assertEqual(cards.count("player-forecast-stat"), 6)
+        self.assertIn(away_name, cards)
+        self.assertIn(home_name, cards)
+        figures = [json.loads(chart.proto.spec) for chart in app.get("plotly_chart")]
+        self.assertEqual([figure["layout"]["title"]["text"] for figure in figures],
+                         ["Points", "Rebounds", "Assists"])
+        away_forecast = forecast.set_index("stat")
+        for figure, stat in zip(figures, ("points", "rebounds", "assists")):
+            projection, line, baseline = figure["data"][:3]
+            row = away_forecast.loc[stat]
+            self.assertEqual(line["x"], [row.low, row.high])
+            self.assertEqual(projection["x"][0], row.prediction)
+            self.assertEqual(projection["type"], "bar")
+            self.assertEqual(projection["orientation"], "h")
+            self.assertNotIn("text", projection)
+            self.assertEqual(projection["hovertext"], [away_name, home_name])
+            self.assertEqual(baseline["x"], [row.baseline])
+            self.assertEqual(baseline["marker"]["symbol"], "circle-open")
+            self.assertEqual(figure["layout"]["yaxis"]["ticktext"], [away_name, home_name])
+        self.assertFalse(any(expander.label == "See forecast ranges on a chart" for expander in app.expander))
+
+        meetings = player.encounters(self.p, away.player_id, home.player_id, selected_date)
+        self.assertFalse(meetings.empty)
+        detail = next(item.proto.body for item in app.get("html") if "player-meeting-table" in item.proto.body)
+        self.assertIn(f'<th scope="col">{away_name}</th><th scope="col">{home_name}</th>', detail)
+        rows = detail.split("<tbody>", 1)[1]
+        self.assertEqual(rows.count("<tr>"), len(meetings))
+        game = meetings.sort_values("date").iloc[-1]
+        first = rows.split("</tr>", 1)[0]
+        self.assertIn(f'datetime="{game.date:%Y-%m-%d}"', first)
+        cells = first.split("<td>")[1:]
+        self.assertEqual(len(cells), 2)
+        box_scores = self.p.loc[self.p.game_id.eq(game.game_id)].set_index("player_id")
+        for cell, who, opponent in zip(cells, (away, home), (home, away)):
+            box = box_scores.loc[who.player_id]
+            other = box_scores.loc[opponent.player_id]
+            self.assertIn(f"<strong>{box.points:.0f}</strong><small>PTS</small>", cell)
+            self.assertIn(f"<strong>{box.rebounds:.0f}</strong><small>REB</small>", cell)
+            self.assertIn(f"<strong>{box.assists:.0f}</strong><small>AST</small>", cell)
+            self.assertIn(f"<strong>{box.minutes:.0f}</strong><small>MIN</small>", cell)
+            for stat in ("points", "rebounds", "assists"):
+                self.assertEqual(f'title="Led in {stat}"' in cell, box[stat] > other[stat])
+            self.assertNotIn('title="Led in minutes"', cell)
+
+        with patch("src.models.player.predict", wraps=player.predict) as predict:
+            app.run()
+            predict.assert_not_called()
 
     def test_team_forecast_custom_spread_and_recent_window(self):
         from streamlit.testing.v1 import AppTest

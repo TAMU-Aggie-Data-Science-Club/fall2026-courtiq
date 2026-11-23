@@ -40,5 +40,5 @@ if page=="Players":
 elif page=="Teams": ui.team_page(ui.table("team_games",version),teams,version)
 elif page=="Compare": ui.player_page(ui.table("player_games",version),ui.table("team_games",version),teams,version)
 else: ui.breakout_page(ui.table("player_season",version),version)
-if page != "Teams" and (page != "Players" or mode == "Scouting Lab"):
+if page == "Trends" or (page == "Players" and mode == "Scouting Lab"):
     ui.methodology(manifest)

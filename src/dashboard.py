@@ -51,31 +51,23 @@ def ranks(version, season, lens):
     return scouting.rankings(table("player_season",version),season,lens)
 
 
-def custom_matchup(lookup, key, latest, *, compact=False, earliest=None):
-    if compact:
-        c1, swap_picker, c2, date_picker = st.columns([1.25, .24, 1.25, 1], gap="small")
-    else:
-        c1, c2 = st.columns(2)
-        date_picker = st
+def custom_matchup(lookup, key, latest, earliest):
+    c1, swap_picker, c2, date_picker = st.columns([1.25, .24, 1.25, 1], gap="small")
     home = c1.selectbox("Home team", list(lookup), format_func=lookup.get, key=key+"_home")
     away = c2.selectbox("Away team", [tid for tid in lookup if tid != home], format_func=lookup.get, key=key+"_away")
-    if compact:
-        def swap_sides():
-            home_key, away_key = key+"_home", key+"_away"
-            st.session_state[home_key], st.session_state[away_key] = (
-                st.session_state[away_key], st.session_state[home_key],
-            )
-
-        swap_picker.button(
-            "Swap home and away", icon=":material/swap_horiz:", help="Swap home and away",
-            on_click=swap_sides, key=key+"_swap_sides",
+    def swap_sides():
+        home_key, away_key = key+"_home", key+"_away"
+        st.session_state[home_key], st.session_state[away_key] = (
+            st.session_state[away_key], st.session_state[home_key],
         )
-    default = (latest + timedelta(days=1)).date()
-    if earliest is not None:
-        default = max(default, earliest)
+
+    swap_picker.button(
+        "Swap home and away", icon=":material/swap_horiz:", help="Swap home and away",
+        on_click=swap_sides, key=key+"_swap_sides",
+    )
+    default = max((latest + timedelta(days=1)).date(), earliest)
     when = date_picker.date_input("Game date", default, min_value=earliest, key=key+"_date")
-    if earliest is not None:
-        date_picker.caption(f"Earliest forecast date: {earliest:%b} {earliest.day}, {earliest.year}.")
+    date_picker.caption(f"Earliest forecast date: {earliest:%b} {earliest.day}, {earliest.year}.")
     return home, away, when
 
 
@@ -86,26 +78,6 @@ def schedule_fixtures(team_ids, version):
         fixtures=pd.concat([fixtures,table("schedule",version)]).drop_duplicates("game_id")
     return fixtures[fixtures.date.gt(pd.Timestamp("2025-04-13")) &
                     fixtures.home_team_id.isin(team_ids) & fixtures.away_team_id.isin(team_ids)]
-
-
-def matchup(teams, version, key, latest):
-    lookup = teams.set_index("team_id").team_name.to_dict()
-    if st.toggle("Build a custom matchup", key=key+"_manual"):
-        return custom_matchup(lookup, key, latest)
-    fixtures = schedule_fixtures(lookup, version)
-    if fixtures.empty:
-        st.info("No supported fixtures in this snapshot. Switch to a custom matchup above.")
-        st.stop()
-    days=sorted(fixtures.date.dt.date.unique())
-    today=pd.Timestamp.today().date()
-    default=next((i for i,d in enumerate(days) if d>=today),len(days)-1)
-    when=st.selectbox("Game day",days,index=default,key=key+"_day",format_func=lambda d:d.strftime("%a, %b %d, %Y"))
-    slate=fixtures[fixtures.date.dt.date.eq(when)].sort_values("home_team_id").set_index("game_id")
-    labels={gid:f"{lookup[r.away_team_id]} at {lookup[r.home_team_id]}" for gid,r in slate.iterrows()}
-    gid=st.selectbox("Game",sorted(labels,key=labels.get),format_func=labels.get,key=key+"_game")
-    row=slate.loc[gid]
-    st.caption(f"League schedule snapshot · Forecast uses box scores before game day, available through {latest:%b %d, %Y}.")
-    return row.home_team_id,row.away_team_id,when
 
 
 def choose(frame,key,label="Player"):
@@ -415,7 +387,7 @@ def performance(prefix):
         st.caption("These checks use the 2025–26 season, held back from training.")
 
 
-TEAM_FORECAST_STYLE = """
+FORECAST_STYLE = """
 <style>
 .stMainBlockContainer {padding-top:3.75rem;}
 .forecast-scoreboard,.forecast-form-cards {display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.7rem;}
@@ -432,25 +404,25 @@ TEAM_FORECAST_STYLE = """
     background:#f3eee4;}
 .forecast-win-bar span {display:block; flex:none; height:100%;}
 .forecast-win-bar span+span {border-inline-start:2px solid #fffdf8; box-sizing:border-box;}
-.st-key-team_swap_sides {width:100%; display:flex; justify-content:center; margin-top:1.75rem;}
-.st-key-team_swap_sides [data-testid="stTooltipHoverTarget"] {justify-content:center !important;}
-.st-key-team_swap_sides button {position:relative; width:2.4rem; height:2.5rem; min-width:0; padding:.35rem;}
-.st-key-team_swap_sides button > span {
+:is(.st-key-team_swap_sides,.st-key-player_swap_sides) {width:100%; display:flex; justify-content:center; margin-top:1.75rem;}
+:is(.st-key-team_swap_sides,.st-key-player_swap_sides) [data-testid="stTooltipHoverTarget"] {justify-content:center !important;}
+:is(.st-key-team_swap_sides,.st-key-player_swap_sides) button {position:relative; width:2.4rem; height:2.5rem; min-width:0; padding:.35rem;}
+:is(.st-key-team_swap_sides,.st-key-player_swap_sides) button > span {
     position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); margin:0;
 }
-.st-key-team_swap_sides button [data-testid="stMarkdownContainer"] {
+:is(.st-key-team_swap_sides,.st-key-player_swap_sides) button [data-testid="stMarkdownContainer"] {
     position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap;
 }
 @media(max-width:640px) {
     .forecast-side {padding:.65rem;}
-    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] .st-key-team_swap_sides) {
+    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] :is(.st-key-team_swap_sides,.st-key-player_swap_sides)) {
         flex-wrap:wrap; gap:.45rem;
     }
-    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] .st-key-team_swap_sides)
+    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] :is(.st-key-team_swap_sides,.st-key-player_swap_sides))
         > [data-testid="stColumn"] {width:auto; min-width:0; flex:1 1 0;}
-    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] .st-key-team_swap_sides)
+    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] :is(.st-key-team_swap_sides,.st-key-player_swap_sides))
         > [data-testid="stColumn"]:nth-child(2) {flex:0 0 2.4rem;}
-    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] .st-key-team_swap_sides)
+    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] :is(.st-key-team_swap_sides,.st-key-player_swap_sides))
         > [data-testid="stColumn"]:last-child {flex:1 0 100%;}
 }
 </style>
@@ -567,21 +539,21 @@ def team_recent_form(team_games, home_id, away_id, when, names, colors):
     st.plotly_chart(fig, use_container_width=True)
 
 
-def team_forecast_matchup(names, version, latest):
+def forecast_matchup(names, version, latest, tool):
     mode = st.radio(
         "Find a matchup", ["Upcoming games", "Past games", "Custom matchup"],
-        key="team_matchup_mode", horizontal=True,
+        key=f"{tool}_matchup_mode", horizontal=True,
     )
     if mode != "Upcoming games":
         try:
-            tasks = bundle("team", version)["tasks"]
+            tasks = bundle(tool, version)["tasks"]
             cutoff = max(pd.Timestamp(task["inference_available_after"]) for task in tasks.values())
         except (ValueError, FileNotFoundError) as exc:
             st.warning(str(exc))
             return None
         earliest = cutoff.date() + timedelta(days=1)
         if mode == "Custom matchup":
-            return custom_matchup(names, "team", latest, compact=True, earliest=earliest)
+            return custom_matchup(names, tool, latest, earliest)
 
     today = pd.Timestamp(datetime.now(ZoneInfo("America/Chicago")).date())
     is_upcoming = mode == "Upcoming games"
@@ -605,13 +577,13 @@ def team_forecast_matchup(names, version, latest):
         team_picker, opponent_picker = st.columns(2)
         game_picker = st
 
-    if "team_fixture_filter" not in st.session_state:
-        st.session_state["team_fixture_filter"] = st.session_state.get("team_fixture_selection", 0)
+    if f"{tool}_fixture_filter" not in st.session_state:
+        st.session_state[f"{tool}_fixture_filter"] = st.session_state.get(f"{tool}_fixture_selection", 0)
     team_id = team_picker.selectbox(
-        "Find by team", [0, *names], key="team_fixture_filter",
+        "Find by team", [0, *names], key=f"{tool}_fixture_filter",
         format_func=lambda tid: names[tid] if tid else "All teams",
     )
-    st.session_state["team_fixture_selection"] = team_id
+    st.session_state[f"{tool}_fixture_selection"] = team_id
     if team_id:
         games = games.loc[games.home_team_id.eq(team_id) | games.away_team_id.eq(team_id)]
     if games.empty:
@@ -621,7 +593,7 @@ def team_forecast_matchup(names, version, latest):
 
     if is_upcoming:
         limit = dates_picker.selectbox(
-            "Dates to show", [3, 7, 14, 30, "all"], key="team_upcoming_limit",
+            "Dates to show", [3, 7, 14, 30, "all"], key=f"{tool}_upcoming_limit",
             format_func=lambda count: "All scheduled dates" if count == "all" else f"Next {count} game days",
         )
         days = games.date.drop_duplicates()
@@ -632,15 +604,14 @@ def team_forecast_matchup(names, version, latest):
             gid: f"{row.date:%b} {row.date.day} · {names[row.away_team_id]} at {names[row.home_team_id]}"
             for gid, row in slate.iterrows()
         }
-        game_id = game_picker.selectbox("Upcoming matchup", list(labels), format_func=labels.get, key="team_upcoming_game")
-        st.caption(f"Showing {len(days)} game {'date' if len(days) == 1 else 'dates'} in the schedule snapshot.")
+        game_label, game_key = "Upcoming matchup", f"{tool}_upcoming_game"
     else:
         opponent = 0
         if team_id:
             opponents = set(games.loc[games.home_team_id.eq(team_id), "away_team_id"])
             opponents.update(games.loc[games.away_team_id.eq(team_id), "home_team_id"])
             opponent = opponent_picker.selectbox(
-                "Opponent", [0, *sorted(opponents, key=names.get)], key=f"team_past_opponent_{team_id}",
+                "Opponent", [0, *sorted(opponents, key=names.get)], key=f"{tool}_past_opponent_{team_id}",
                 format_func=lambda tid: names[tid] if tid else "Any opponent",
                 help="Includes meetings at either team's home court.",
             )
@@ -650,19 +621,19 @@ def team_forecast_matchup(names, version, latest):
         game_picker = st.container()
         months = games.date.dt.strftime("%Y-%m")
         month_options = sorted(months.unique(), reverse=True)
-        previous_month = st.session_state.get("team_past_month")
-        previous_day = st.session_state.get("team_past_date")
+        previous_month = st.session_state.get(f"{tool}_past_month")
+        previous_day = st.session_state.get(f"{tool}_past_date")
         filters = (team_id, opponent)
-        changed_filter = st.session_state.get("team_past_last_filter") != filters
+        changed_filter = st.session_state.get(f"{tool}_past_last_filter") != filters
         if previous_month not in month_options or (
             changed_filter and previous_day is not None and not games.date.eq(pd.Timestamp(previous_day)).any()
         ):
             previous_month = month_options[0]
-        st.session_state["team_past_last_filter"] = filters
-        st.session_state["team_past_month"] = previous_month
+        st.session_state[f"{tool}_past_last_filter"] = filters
+        st.session_state[f"{tool}_past_month"] = previous_month
         month = month_picker.selectbox(
             "Month", month_options,
-            format_func=lambda value: pd.Period(value, freq="M").strftime("%B %Y"), key="team_past_month",
+            format_func=lambda value: pd.Period(value, freq="M").strftime("%B %Y"), key=f"{tool}_past_month",
         )
         month_games = games.loc[months.eq(month)]
         game_counts = month_games.groupby(month_games.date.dt.date).game_id.nunique().sort_index(ascending=False)
@@ -670,11 +641,22 @@ def team_forecast_matchup(names, version, latest):
             day: f"{day:%b} {day.day} · {count} {'game' if count == 1 else 'games'}"
             for day, count in game_counts.items()
         }
-        st.session_state["team_past_date"] = previous_day if previous_day in days else next(iter(days))
-        day = day_picker.selectbox("Game day", list(days), format_func=days.get, key="team_past_date")
+        st.session_state[f"{tool}_past_date"] = previous_day if previous_day in days else next(iter(days))
+        day = day_picker.selectbox("Game day", list(days), format_func=days.get, key=f"{tool}_past_date")
         slate = month_games.loc[month_games.date.eq(pd.Timestamp(day))].set_index("game_id")
         labels = {gid: f"{names[row.away_team_id]} at {names[row.home_team_id]}" for gid, row in slate.iterrows()}
-        game_id = game_picker.selectbox("Matchup", list(labels), format_func=labels.get, key="team_past_game")
+        game_label, game_key = "Matchup", f"{tool}_past_game"
+    if not labels:
+        game_picker.info("No matchups are available for the current filters.")
+        return None
+    if st.session_state.get(game_key) not in labels:
+        st.session_state[game_key] = next(iter(labels))
+    game_id = game_picker.selectbox(game_label, list(labels), format_func=labels.get, key=game_key)
+    if game_id not in labels:
+        game_picker.info("The selected matchup is no longer available. Choose a game from the list.")
+        return None
+    if is_upcoming:
+        st.caption(f"Showing {len(days)} game {'date' if len(days) == 1 else 'dates'} in the schedule snapshot.")
     selected = slate.loc[game_id]
     return selected.home_team_id, selected.away_team_id, selected.date.date()
 
@@ -717,11 +699,11 @@ def forecast_actual_score(actual, home, away, forecast):
 
 
 def team_page(t, teams, version):
-    st.html(TEAM_FORECAST_STYLE)
+    st.html(FORECAST_STYLE)
     st.header("Team Forecasts")
     st.write("Pick a matchup to see each team’s chance of winning, the projected score, and how both teams have played lately.")
     names = teams.set_index("team_id").team_name.to_dict()
-    matchup_choice = team_forecast_matchup(names, version, t.date.max())
+    matchup_choice = forecast_matchup(names, version, t.date.max(), "team")
     if matchup_choice is None:
         return
     h, a, when = matchup_choice
@@ -795,51 +777,240 @@ def team_page(t, teams, version):
             st.caption(f"This model supports dates after {result['cutoff']}. Dataset version {result['version']}.")
 
 
-def player_page(p,t,teams,version):
+PLAYER_MATCHUP_STYLE = """
+<style>
+.player-forecast-stat {border-top:1px solid color-mix(in srgb,var(--accent) 30%,transparent);
+    padding:.45rem 0;}
+.player-forecast-stat:first-of-type {margin-top:.6rem;}
+.player-forecast-values {display:flex; align-items:baseline; flex-wrap:wrap; gap:.15rem .6rem;}
+.player-forecast-values strong {font-size:1.5rem;}
+.player-forecast-values span,.player-forecast-stat small {font-size:.83rem;}
+.player-forecast-stat small {display:block;}
+.player-meeting-table {width:100%; table-layout:fixed; border-collapse:collapse; font-size:.9rem;}
+.player-meeting-table th,.player-meeting-table td {padding:.6rem .7rem; vertical-align:top;
+    text-align:left; border-bottom:1px solid color-mix(in srgb,currentColor 18%,transparent);
+    overflow-wrap:anywhere;}
+.player-meeting-table thead {background:color-mix(in srgb,currentColor 8%,transparent);}
+.player-meeting-table tbody tr:nth-child(even) {background:rgba(181,75,28,.035);}
+.player-meeting-date {width:6rem;}
+.player-meeting-team {display:block; margin-bottom:.35rem; font-size:.82rem;}
+.player-meeting-stats {display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.2rem;}
+.player-meeting-stats span {display:flex; flex-direction:column; padding:.15rem .25rem;}
+.player-meeting-stats .player-meeting-lead {
+    border-radius:.35rem; background:rgba(22,132,88,.15);
+}
+.player-meeting-lead small::after {content:" ↑";}
+.player-meeting-stats strong {font-variant-numeric:tabular-nums;}
+.player-meeting-stats small,.player-meeting-table time small {font-size:.72rem;}
+@media(max-width:640px) {
+    .player-meeting-table th,.player-meeting-table td {padding:.5rem .38rem;}
+    .player-meeting-date {width:3.65rem;}
+    .player-meeting-stats {grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+</style>
+"""
+
+
+@st.cache_data(show_spinner=False, max_entries=512)
+def cached_player_forecast(version, model_modified, player_id, opponent_id, when, home):
+    from src.models import player
+    from threadpoolctl import threadpool_limits
+
+    with threadpool_limits(limits=1, user_api="openmp"):
+        forecast, _ = player.predict(
+            table("player_games", version), table("team_games", version),
+            player_id, opponent_id, when, home, model("player", version, model_modified),
+        )
+    return forecast
+
+
+def player_forecast_cards(sides, forecasts, recent):
+    from html import escape
+
+    stat_labels = {"points": "PTS", "rebounds": "REB", "assists": "AST"}
+    cards = []
+    for (side, player_id, player_name, team_name, color), forecast in zip(sides, forecasts):
+        games = recent.loc[recent.player_id.eq(player_id)].tail(10)
+        stats = []
+        for row in forecast.itertuples():
+            count = int(games[row.stat].count())
+            baseline_label = "recent avg." if count else "training avg."
+            stats.append(
+                f'<div class="player-forecast-stat"><b>{stat_labels[row.stat]}</b>'
+                '<div class="player-forecast-values">'
+                f'<strong>{row.prediction:.1f}</strong><span>projected</span>'
+                f'<span>{row.baseline:.1f} {baseline_label}</span></div>'
+                f'<small>80% range {row.low:.1f}–{row.high:.1f}</small></div>'
+            )
+        availability = f"Recent averages use {len(games)} {'game' if len(games) == 1 else 'games'} this season."
+        if games.empty:
+            availability = "No earlier games this season. The comparison uses a training average."
+        cards.append(
+            f'<article class="forecast-side" style="--accent:{color}">'
+            f'<small>{side} · {escape(team_name)}</small><h4>{escape(player_name)}</h4>'
+            + "".join(stats) + f"<small>{availability}</small></article>"
+        )
+    st.html('<div class="forecast-scoreboard player-forecast-cards">' + "".join(cards) + "</div>")
+
+
+def player_forecast_charts(sides, forecasts, recent):
+    import plotly.graph_objects as go
+
+    st.markdown("**Compare projections and ranges**")
+    st.caption("Bar length shows the projection. ○ marks the recent average (or training average), and the line shows the approximate 80% range.")
+    stats = (("points", "Points"), ("rebounds", "Rebounds"), ("assists", "Assists"))
+    forecasts_by_stat = [forecast.set_index("stat") for forecast in forecasts]
+    row_labels = [side[2] for side in sides]
+    if row_labels[0] == row_labels[1]:
+        row_labels = [f"{side[2]} ({side[0]})" for side in sides]
+    with st.container(key="player_forecast_charts"):
+        for stat, title in stats:
+            values = [forecast.loc[stat] for forecast in forecasts_by_stat]
+            fig = go.Figure(go.Bar(
+                x=[row.prediction for row in values], y=[1, 0], orientation="h", width=.48,
+                marker=dict(color=[side[4] for side in sides]), opacity=.6, hovertext=row_labels,
+                hovertemplate="%{hovertext}<br>Projection: %{x:.1f}<extra></extra>",
+            ))
+            maximum = max(1, *(max(row.prediction, row.baseline, row.high) for row in values))
+            for y, side, row in zip((1, 0), sides, values):
+                _, pid, name, _, _ = side
+                game_values = recent.loc[recent.player_id.eq(pid), stat].tail(10)
+                baseline = "Recent average" if game_values.notna().any() else "Training average"
+                fig.add_trace(go.Scatter(
+                    x=[row.low, row.high], y=[y, y], mode="lines",
+                    line=dict(color="#425563", width=3),
+                    hovertemplate=f"{name}<br>80% range: {row.low:.1f}–{row.high:.1f}<extra></extra>",
+                ))
+                fig.add_trace(go.Scatter(
+                    x=[row.baseline], y=[y], mode="markers",
+                    marker=dict(color="#202c36", symbol="circle-open", size=13, line=dict(width=2)),
+                    hovertemplate=f"{name}<br>{baseline}: %{{x:.1f}}<extra></extra>",
+                ))
+            fig.update_layout(
+                title=dict(text=title, x=.03, font=dict(size=15)),
+                height=210, margin=dict(l=110, r=22, t=38, b=32), showlegend=False,
+            )
+            fig.update_yaxes(
+                tickmode="array", tickvals=[1, 0], ticktext=row_labels,
+                range=[-.55, 1.55], automargin=True, fixedrange=True, tickfont=dict(size=11),
+            )
+            fig.update_xaxes(range=[0, maximum * 1.12], fixedrange=True)
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
+def player_past_meetings(players, away_id, home_id, when, away_name, home_name, teams):
+    from html import escape
+    from src.models import player
+
+    st.subheader("Past meetings")
+    meetings = player.encounters(players, away_id, home_id, when)
+    count = len(meetings)
+    st.write(f"**{count} recorded {'meeting' if count == 1 else 'meetings'}**")
+    st.caption("Both players appeared on opposing teams in these games. The box scores don’t show who guarded whom.")
+    if not count:
+        return
+    if count < 3:
+        st.info("This is a small sample. A single game can give a very different impression of the matchup.")
+    st.caption("A highlight and arrow mark the higher total for points, rebounds, or assists in each game.")
+    columns = ["game_id", "points", "rebounds", "assists", "minutes"]
+    home_games = players.loc[players.player_id.eq(home_id) & players.played, columns]
+    meetings = meetings.merge(home_games, on="game_id", validate="one_to_one", suffixes=("", "_other"))
+    meetings = meetings.sort_values("date", ascending=False)
+
+    def box_score(game, suffix):
+        team = teams.get(getattr(game, f"team_id{suffix}"), "Team unavailable")
+        stats = []
+        other_suffix = "" if suffix else "_other"
+        for stat, label in (("points", "PTS"), ("rebounds", "REB"), ("assists", "AST"), ("minutes", "MIN")):
+            value = getattr(game, f"{stat}{suffix}")
+            other = getattr(game, f"{stat}{other_suffix}")
+            display = f"{value:.0f}" if pd.notna(value) else "—"
+            leads = stat != "minutes" and pd.notna(value) and pd.notna(other) and value > other
+            marker = f' class="player-meeting-lead" title="Led in {stat}"' if leads else ""
+            stats.append(f"<span{marker}><strong>{display}</strong><small>{label}</small></span>")
+        return (
+            f'<td><span class="player-meeting-team">{escape(team)}</span>'
+            f'<div class="player-meeting-stats">{"".join(stats)}</div></td>'
+        )
+
+    rows = []
+    for game in meetings.itertuples():
+        date = game.date
+        rows.append(
+            f'<tr><th scope="row"><time datetime="{date:%Y-%m-%d}">'
+            f'{date:%b} {date.day}<br><small>{date.year}</small></time></th>'
+            f'{box_score(game, "")}{box_score(game, "_other")}</tr>'
+        )
+    st.html(
+        '<table class="player-meeting-table" aria-label="Past meeting box scores">'
+        '<thead><tr><th class="player-meeting-date" scope="col">Game date</th>'
+        f'<th scope="col">{escape(away_name)}</th><th scope="col">{escape(home_name)}</th>'
+        f'</tr></thead><tbody>{"".join(rows)}</tbody></table>'
+    )
+
+
+def player_page(p, t, teams, version):
+    st.html(FORECAST_STYLE + PLAYER_MATCHUP_STYLE)
     st.header("Player Matchup Lab")
-    st.caption("Pick a game and one player on each side. Compare expected points, rebounds and assists against the opposing team.")
-    home,away,when=matchup(teams,version,"player",p.date.max())
-    prior=p[p.date.lt(pd.Timestamp(when)) & p.played]
-    ordered=prior.sort_values(["date","game_id"])
-    roster=ordered.drop_duplicates("player_id",keep="last").copy()
-    recent=ordered.groupby("player_id").tail(10)
-    roster["recent_minutes"]=roster.player_id.map(recent.groupby("player_id").minutes.mean())
-    roster=roster[roster.season_start.eq(roster.season_start.max())]
-    st.caption("Players are listed by recent minutes with their last recorded team. Availability and individual guarding assignments are unconfirmed.")
-    c1,c2=st.columns(2)
-    with c1: a=choose(roster[roster.team_id.eq(home)],"p_a","Home player")
-    with c2: b=choose(roster[roster.team_id.eq(away)],"p_b","Away player")
-    if a is None or b is None: st.info("No supported historical roster for this date."); return
-    if st.button("Compare players & predict"):
-        try:
-            from src.models import player
-            from threadpoolctl import threadpool_limits
-            models=bundle("player",version)
-            with threadpool_limits(limits=1,user_api="openmp"):
-                left,_=player.predict(p,t,a,away,when,True,models)
-                right,_=player.predict(p,t,b,home,when,False,models)
-            left["player"]=roster.set_index("player_id").loc[a,"player_name"]
-            right["player"]=roster.set_index("player_id").loc[b,"player_name"]
-            result=pd.concat([left,right])
-            result["stat"]=result.stat.str.title()
-            result["upper"]=result.high-result.prediction
-            result["lower"]=result.prediction-result.low
-            st.plotly_chart(px.bar(result,x="stat",y="prediction",color="player",barmode="group",error_y="upper",error_y_minus="lower",color_discrete_sequence=[team_color(teams,home),team_color(teams,away)],labels={"stat":"Statistic","prediction":"Expected per game","player":"Player"}),use_container_width=True)
-            st.caption("Whiskers show the approximate 80% prediction range based on historical errors.")
-            with st.expander("Compare with each player’s recent average"):
-                detail=result[["player","stat","prediction","baseline","low","high"]].copy()
-                detail.columns=["Player","Statistic","Forecast","Recent baseline","Lower estimate","Upper estimate"]
-                st.dataframe(detail.round(1),hide_index=True)
-                st.caption("The baseline averages up to ten prior games this season, using a training average when no games are available.")
-            encounter=player.encounters(p,a,b,when)
-            st.write(f"Recorded opposing-player encounters: {len(encounter)}")
-            if len(encounter)<3: st.info("Sparse encounter history. Model uses broader player and opponent-team context, not an invented defender effect.")
-            if len(encounter):
-                with st.expander("Home player’s past games against the selected player"):
-                    detail=encounter[["date","season","points","rebounds","assists","minutes"]].sort_values("date",ascending=False)
-                    st.dataframe(detail.rename(columns=str.title),hide_index=True)
-        except (ValueError,FileNotFoundError) as exc: st.warning(str(exc))
+    st.write("Pick a game and one player on each side to compare projected points, rebounds, and assists. See how both players did in recorded meetings.")
+    if p.empty:
+        st.info("No player game logs are available in this snapshot.")
+        return
+    team_names = teams.set_index("team_id").team_name.to_dict()
+    matchup_choice = forecast_matchup(team_names, version, p.date.max(), "player")
+    if matchup_choice is None:
+        return
+    home, away, when = matchup_choice
+    st.caption(f"Player box scores are available through {p.date.max():%b %d, %Y}. Forecasts use games before the selected date.")
+
+    prior = p.loc[p.date.lt(pd.Timestamp(when)) & p.played].sort_values(["date", "game_id"])
+    roster = prior.drop_duplicates("player_id", keep="last").copy()
+    recent = prior.groupby("player_id").tail(10)
+    roster["recent_minutes"] = roster.player_id.map(recent.groupby("player_id").minutes.mean())
+    roster = roster.loc[roster.season_start.eq(roster.season_start.max())]
+    st.caption("Choose players from their last recorded teams before this matchup. The snapshot doesn’t confirm active lineups.")
+    away_col, home_col = st.columns(2)
+    with away_col:
+        away_id = choose(roster.loc[roster.team_id.eq(away)], "p_b", "Away player")
+    with home_col:
+        home_id = choose(roster.loc[roster.team_id.eq(home)], "p_a", "Home player")
+    if away_id is None or home_id is None:
+        st.info("A player is needed from both teams. Try another date or matchup with recorded rosters.")
+        return
+
+    player_names = roster.set_index("player_id").player_name
+    sides = [
+        ("Away", away_id, player_names[away_id], team_names[away], team_color(teams, away)),
+        ("Home", home_id, player_names[home_id], team_names[home], team_color(teams, home)),
+    ]
+    st.subheader("Player forecasts")
+    try:
+        modified = (APP.parent / "artifacts" / "player.pkl").stat().st_mtime_ns
+        forecasts = [
+            cached_player_forecast(version, modified, away_id, home, when, False),
+            cached_player_forecast(version, modified, home_id, away, when, True),
+        ]
+    except (ValueError, FileNotFoundError) as exc:
+        st.warning(str(exc))
+    else:
+        game_day = pd.Timestamp(when)
+        season_start = game_day.year if game_day.month >= 7 else game_day.year - 1
+        recent_season = prior.loc[prior.season_start.eq(season_start)]
+        player_forecast_cards(sides, forecasts, recent_season)
+        st.caption("Projections and ranges are estimates for each player against the opposing team.")
+        player_forecast_charts(sides, forecasts, recent_season)
+
+    player_past_meetings(p, away_id, home_id, when, player_names[away_id], player_names[home_id], team_names)
     performance("player")
+    with st.expander("How to read Player Matchups"):
+        st.markdown(
+            f"""
+- **Projected PTS, REB, and AST** — Estimated points, rebounds, and assists for each player against the opposing team.
+- **Recent average** — Up to 10 earlier played games in the same season. When none are available for a stat, the comparison uses the training average.
+- **80% range** — An approximate set of outcomes based on historical forecast errors. Players can finish outside it.
+- **Past meetings** — Games in this snapshot before the selected date where both players appeared for opposing teams. The box scores show each player's team and individual result. [Historical NBA box scores]({SOURCE_NBA})
+            """
+        )
 
 
 def breakout_page(seasons,version):
