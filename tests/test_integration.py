@@ -201,22 +201,34 @@ class RealTests(unittest.TestCase):
         self.assertEqual(len(at.exception),0,str(at.exception))
         self.assertFalse(at.button)
         if at.radio(key="team_matchup_mode").value == "Upcoming Games":
-            self.assertFalse(any("Actual final" in item.value for item in at.markdown))
+            self.assertFalse(any('class="forecast-final-heading"' in item.proto.body for item in at.get("html")))
         scoreboard = next(item.proto.body for item in at.get("html") if 'class="forecast-scoreboard"' in item.proto.body)
         expected = team.predict(self.t, home, away, date, spread)
+        self.assertIn(f'Projected total · <b>{expected["total"]:.1f} points</b>', scoreboard)
         for side in ("home", "away"):
             self.assertIn(f"{expected[f'{side}_score']:.1f}", scoreboard)
             self.assertIn(f"{expected[f'{side}_win']:.1%} win chance", scoreboard)
-        # Without a spread the margin section stays hidden; only the recent-form chart renders.
-        self.assertEqual(len(at.get("plotly_chart")), 1)
-        self.assertFalse(any("Projected margin" in item.value for item in at.markdown))
-        self.assertTrue(any("Include home spread" in item.value for item in at.caption))
+        self.assertEqual(len(at.get("plotly_chart")), 2)
+        key = next(item.proto.body for item in at.get("html") if 'aria-label="Point margin chart key"' in item.proto.body)
+        self.assertIn("<b>Projected</b>", key)
+        self.assertIn("80% range", key)
+        self.assertNotIn("<b>Spread</b>", key)
+        chart = json.loads(at.get("plotly_chart")[0].proto.spec)
+        self.assertEqual(chart["data"][0]["x"], [expected["distribution"]["low"], expected["distribution"]["high"]])
+        self.assertNotIn("Spread", chart["layout"]["yaxis"]["ticktext"])
+        if at.radio(key="team_matchup_mode").value == "Upcoming Games":
+            self.assertNotIn("Actual", chart["layout"]["yaxis"]["ticktext"])
         at.toggle(key="team_use_spread").set_value(True).run()
         self.assertFalse(at.exception)
-        self.assertTrue(any("Projected margin" in item.value for item in at.markdown))
-        interval = json.loads(at.get("plotly_chart")[0].proto.spec)["data"][0]["x"]
+        key = next(item.proto.body for item in at.get("html") if 'aria-label="Point margin chart key"' in item.proto.body)
+        self.assertIn("<b>Spread</b>", key)
+        chart = json.loads(at.get("plotly_chart")[0].proto.spec)
         with_spread = team.predict(self.t, home, away, date, -4.5)
-        self.assertEqual(interval, [with_spread["distribution"]["low"], with_spread["distribution"]["high"]])
+        self.assertEqual(chart["data"][0]["x"], [with_spread["distribution"]["low"], with_spread["distribution"]["high"]])
+        spread_marker = next(trace for trace in chart["data"] if trace.get("name") == "Spread")
+        self.assertEqual(spread_marker["x"], [4.5])
+        self.assertIn(spread_marker["y"][0], (0, .25))
+        self.assertNotIn("Spread", chart["layout"]["yaxis"]["ticktext"])
         at.sidebar.radio[0].set_value("Compare").run()
         self.assertEqual(len(at.exception),0,str(at.exception))
         self.assertFalse(at.button)
@@ -224,6 +236,20 @@ class RealTests(unittest.TestCase):
         self.assertEqual(cards.count('class="ciq-card"'), 2)
         for label in ("PTS", "REB", "AST"):
             self.assertEqual(cards.count(f"<b>{label}</b>"), 2)
+        charts = [json.loads(item.proto.spec) for item in at.get("plotly_chart")]
+        self.assertEqual([chart["layout"]["title"]["text"] for chart in charts], ["Points", "Rebounds", "Assists"])
+        for chart in charts:
+            bars, away_range, home_range, average = chart["data"][:4]
+            self.assertEqual(bars["orientation"], "v")
+            self.assertEqual(average["marker"]["symbol"], "circle-open")
+            for whisker in (away_range, home_range):
+                low, high, _, low_cap, _, _, high_cap, _ = whisker["y"]
+                self.assertEqual((low, high), (low_cap, high_cap))
+            self.assertEqual(chart["layout"]["yaxis"]["ticks"], "outside")
+            self.assertFalse(chart["layout"]["xaxis"]["showticklabels"])
+        label_rows = [item.proto.body for item in at.get("html") if 'class="player-chart-labels"' in item.proto.body]
+        self.assertEqual(len(label_rows), 3)
+        self.assertTrue(all(row.count("<span>") == 2 for row in label_rows))
         self.assertTrue(any(item.value == "Past meetings" for item in at.subheader))
 
     def test_team_forecast_custom_spread_and_recent_window(self):
@@ -254,14 +280,16 @@ class RealTests(unittest.TestCase):
             self.assertEqual(at.selectbox(key="team_away").value, home)
             self.assertEqual(predict.call_args.args[1:4], (away, home, day))
         self.assertFalse(at.exception)
-        self.assertTrue(any("-5.5" in item.value and "Home covers" in item.value
-                            and "Away covers" in item.value for item in at.markdown))
+        key = next(item.proto.body for item in at.get("html") if 'aria-label="Point margin chart key"' in item.proto.body)
+        self.assertIn("-5.5", key)
+        self.assertTrue(any("Home covers" in item.value and "Away covers" in item.value for item in at.markdown))
         recent = json.loads(at.get("plotly_chart")[-1].proto.spec)
         self.assertTrue(all(len(trace["x"]) <= 10 for trace in recent["data"]))
-        self.assertTrue(all("Opponent" in trace["hovertemplate"] and "Final score" in trace["hovertemplate"]
+        self.assertTrue(all("%{customdata[0]} %{customdata[1]}" in trace["hovertemplate"]
+                            and "%{customdata[2]} · Margin %{y:+.0f} pts<extra></extra>" in trace["hovertemplate"]
                             for trace in recent["data"]))
         self.assertTrue(all(result.startswith(("W ", "L ")) for trace in recent["data"]
-                            for _, result in trace["customdata"]))
+                            for _, _, result in trace["customdata"]))
         self.assertEqual(at.radio(key="team_recent_window").label, "Recent games per team")
         cards = next(item.proto.body for item in at.get("html") if 'class="forecast-form-cards"' in item.proto.body)
         self.assertEqual(cards.count("forecast-form-record"), 2)
@@ -314,19 +342,37 @@ class RealTests(unittest.TestCase):
         self.assertTrue(at.selectbox(key="team_past_game").options)
         self.assertFalse(at.exception)
         self.assertTrue(any(item.value == "Historical forecast" for item in at.subheader))
+        self.assertTrue(any(
+            item.value == f"This forecast uses only box scores from games played before {day:%b} {day.day}, {day.year}."
+            for item in at.caption
+        ))
         game = recorded.set_index("game_id").loc[at.selectbox(key="team_past_game").value]
         names = pd.read_csv(APP / "teams.csv.gz").set_index("team_id").team_name
         home, away = names[game.home_team_id], names[game.away_team_id]
-        final = f"**Actual final** · {away} {game.away_points:.0f} · {home} {game.home_points:.0f}"
-        self.assertTrue(any(item.value == final for item in at.markdown))
+        winner = home if game.home_points > game.away_points else away
+        final = next(item.proto.body for item in at.get("html") if 'class="forecast-result-scores"' in item.proto.body)
+        self.assertIn('<div class="forecast-final-heading"><h4>Final score</h4>', final)
+        self.assertEqual(final.count('class="forecast-winner"'), 1)
+        self.assertIn(f'<strong class="forecast-winner">{winner} {max(game.away_points, game.home_points):.0f}', final)
+        for name, score in ((away, game.away_points), (home, game.home_points)):
+            self.assertIn(f'{name} {score:.0f}', final)
         forecast = team.predict(self.t, game.home_team_id, game.away_team_id, day)
-        home_chance, away_chance = [round(100 * forecast[f"{side}_win"], 1) for side in ("home", "away")]
+        home_chance, away_chance = forecast["home_win"], forecast["away_win"]
         if home_chance != away_chance:
             favorite = home if home_chance > away_chance else away
-            winner = home if game.home_points > game.away_points else away
-            verdict = (f"{favorite}, the forecast favorite, won." if winner == favorite
-                       else f"{winner} won. The forecast favored {favorite}.")
-            self.assertTrue(any(item.value == verdict for item in at.caption))
+            verdict = "Model correctly picked the winner" if winner == favorite else "Model picked the wrong winner"
+            self.assertIn(f'{verdict}</span></div>', final)
+        actual_margin = game.home_points - game.away_points
+        chart = json.loads(at.get("plotly_chart")[0].proto.spec)
+        self.assertEqual(next(trace["x"] for trace in chart["data"] if trace.get("name") == "Actual"), [actual_margin])
+        at.toggle(key="team_use_spread").set_value(True)
+        at.toggle(key="dark_mode").set_value(True).run()
+        self.assertFalse(at.exception)
+        chart = json.loads(at.get("plotly_chart")[0].proto.spec)
+        markers = {trace.get("name"): trace["x"] for trace in chart["data"]}
+        self.assertEqual(markers["Actual"], [actual_margin])
+        self.assertEqual(markers["Spread"], [4.5])
+        self.assertEqual(chart["layout"]["paper_bgcolor"], "#121b22")
 
         self.assertNotIn("August 2025", at.selectbox(key="team_past_month").options)
         old_day = recorded.loc[recorded.date.ge("2025-10-22"), "date"].min()
