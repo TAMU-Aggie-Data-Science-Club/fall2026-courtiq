@@ -494,6 +494,29 @@ class RealTests(unittest.TestCase):
         self.assertAlmostEqual(trend.iloc[-1].on_margin, 48 * 20 / 200)
         self.assertAlmostEqual(trend.iloc[-1].off_margin, 48 * 10 / 280)
 
+    def test_switching_past_months_keeps_a_valid_matchup(self):
+        # Regression: switching months with a team + opponent filter used to keep a
+        # stale game id and crash with KeyError in forecast_matchup (PR #29).
+        from streamlit.testing.v1 import AppTest
+
+        games = pd.read_csv(APP / "games.csv.gz", parse_dates=["date"])
+        names = pd.read_csv(APP / "teams.csv.gz").set_index("team_id").team_name
+        celtics = int(names[names.str.contains("Celtics")].index[0])
+        bulls = int(names[names.str.contains("Bulls")].index[0])
+        meetings = games.loc[games.home_team_id.isin([celtics, bulls]) & games.away_team_id.isin([celtics, bulls])]
+        for page, key in (("Compare", "player"), ("Teams", "team")):
+            with self.subTest(page=page):
+                at = AppTest.from_file("app.py", default_timeout=60).run()
+                at.sidebar.radio[0].set_value(page).run()
+                at.radio(key=f"{key}_matchup_mode").set_value("Past Games").run()
+                at.selectbox(key=f"{key}_fixture_filter").set_value(celtics).run()
+                at.selectbox(key=f"{key}_past_opponent_{celtics}").set_value(bulls).run()
+                months = sorted(meetings.loc[meetings.date.ge("2025-10-01"), "date"].dt.strftime("%Y-%m").unique())
+                self.assertGreater(len(months), 1)
+                for month in months + months:
+                    at.selectbox(key=f"{key}_past_month").set_value(month).run()
+                    self.assertEqual(len(at.exception), 0, f"{page} {month}: {at.exception}")
+
 
 if __name__=="__main__": unittest.main()
 
