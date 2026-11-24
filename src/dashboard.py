@@ -83,6 +83,14 @@ DARK_STYLE = """
     background:#1b2731 !important; color:#ece6da !important; border-color:#3a4a56 !important;}
 .stApp [data-baseweb="select"] svg, .stApp [data-testid="stNumberInput"] button svg {fill:#ece6da; color:#ece6da;}
 .stApp [data-testid="stNumberInput"] button {background:#22313c; color:#ece6da; border-color:#3a4a56;}
+.stApp .st-key-team_spread :is([data-baseweb="input"], [data-baseweb="base-input"]):has(input:disabled),
+.stApp .st-key-team_spread input:disabled,
+.stApp .st-key-team_spread button:disabled {
+    background:#29333b !important; color:#b9c2c8 !important; border-color:#4a555e !important;
+    opacity:1;
+}
+.stApp .st-key-team_spread input:disabled {-webkit-text-fill-color:#b9c2c8 !important;}
+.stApp .st-key-team_spread button:disabled svg {fill:#8e9aa3; color:#8e9aa3;}
 [data-baseweb="popover"] > div, [data-baseweb="menu"], [data-baseweb="popover"] ul, [role="listbox"],
 [data-baseweb="calendar"], [data-baseweb="calendar"] > div, [data-testid="stPopoverBody"] {
     background:#1b2731 !important; color:#ece6da !important;}
@@ -102,6 +110,12 @@ DARK_STYLE = """
 .stApp [data-testid="stMain"] [data-testid="stBaseButton-pills"], .stApp [data-testid="stPopover"] button,
 .stApp [data-testid="stDownloadButton"] button {
     background:#1b2731 !important; color:#ece6da !important; border-color:#3a4a56 !important;}
+[data-testid="stPopoverBody"] [data-testid="stDownloadButton"] button {
+    background:#22313c !important; color:#ece6da !important; border-color:#52636f !important;}
+[data-testid="stPopoverBody"] [data-testid="stDownloadButton"] button :is(p, span, svg) {
+    color:inherit !important;}
+[data-testid="stPopoverBody"] [data-testid="stDownloadButton"] button:is(:hover,:focus-visible) {
+    background:#2a3b47 !important; border-color:#e08b4f !important;}
 .stApp [data-testid="stMain"] [data-testid="stBaseButton-segmented_controlActive"],
 .stApp [data-testid="stMain"] [data-testid="stBaseButton-pillsActive"] {
     background:color-mix(in srgb,#e08b4f 22%,#1b2731) !important; color:#ffd8bd !important; border-color:#e08b4f !important;}
@@ -925,6 +939,29 @@ TEAM_FORECAST_STYLE = """
 .forecast-side small {font-size:.85rem;}
 .forecast-score {display:block; font-size:clamp(1.7rem,5vw,2.7rem); line-height:1.15;}
 .forecast-chance {display:block; margin-top:.4rem;}
+.forecast-team-heading {display:flex;flex-wrap:wrap;align-items:center;gap:.2rem .45rem;}
+.forecast-favorite {display:inline-block;padding:.12rem .45rem;border-radius:999px;
+    border:1px solid color-mix(in srgb,var(--accent) 60%,transparent);
+    background:color-mix(in srgb,var(--accent) 15%,transparent);font-size:.78rem;font-weight:600;}
+.forecast-scoreboard .forecast-side {border-top-width:1px;border-inline-start:4px solid var(--accent);}
+.forecast-result {background:color-mix(in srgb,currentColor 5%,transparent);
+    border:1px solid #8794a455;border-radius:.65rem;padding:.65rem .85rem;}
+.forecast-result-scores {display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .65rem;font-size:.95rem;}
+.forecast-winner {font-weight:700;}
+.forecast-winner-label {margin-inline-start:.3rem;font-size:.78rem;color:var(--result-win);}
+.forecast-final-heading {display:flex;flex-wrap:wrap;align-items:center;gap:.35rem .65rem;margin-bottom:.35rem;}
+.forecast-final-heading h4 {margin:0;padding:0;}
+.forecast-verdict {border:1px solid #8794a466;border-radius:999px;padding:.15rem .5rem;font-size:.8rem;font-weight:600;}
+.forecast-verdict[data-result="correct"] {--badge-color:var(--result-win);}
+.forecast-verdict[data-result="missed"] {--badge-color:var(--result-miss);}
+.forecast-verdict[data-result] {color:var(--badge-color,currentColor);
+    background:color-mix(in srgb,var(--badge-color,currentColor) 12%,transparent);
+    border-color:color-mix(in srgb,var(--badge-color,currentColor) 55%,transparent);}
+.forecast-total {display:block;margin-top:.4rem;}
+.forecast-margin-key {display:flex;flex-wrap:wrap;gap:.45rem .65rem;margin:.2rem 0 .45rem;}
+.forecast-margin-key > span {display:inline-flex;align-items:center;gap:.45rem;
+    border:1px solid #8794a466;border-radius:.5rem;padding:.2rem .4rem;font-size:.82rem;}
+.forecast-margin-symbol {color:var(--cue);font-weight:700;min-width:1em;text-align:center;}
 .forecast-form-record {display:block; font-size:1.4rem;}
 .forecast-form-coverage {display:block; margin-top:.35rem;}
 .forecast-win-bar {display:flex; height:.65rem; margin:.7rem 0 0; border-radius:999px; overflow:hidden;
@@ -971,9 +1008,14 @@ def forecast_scoreboard(result, home, away, colors):
     for side, name in (("away", away), ("home", home)):
         score = result[f"{side}_score"]
         probability = result[f"{side}_win"]
+        other_side = "home" if side == "away" else "away"
+        favorite = (
+            '<span class="forecast-favorite"><span aria-hidden="true">🎯</span> Predicted winner</span>'
+            if probability > result[f"{other_side}_win"] else ""
+        )
         cards.append(
             f'<article class="forecast-side" style="--accent:{colors[name]}">'
-            f'<small>{side.title()}</small><h4>{escape(name)}</h4>'
+            f'<small>{side.title()}</small><div class="forecast-team-heading"><h4>{escape(name)}</h4>{favorite}</div>'
             f'<strong class="forecast-score">{score:.1f}</strong><small>Projected points</small>'
             f'<b class="forecast-chance">{probability:.1%} win chance</b></article>'
         )
@@ -982,20 +1024,24 @@ def forecast_scoreboard(result, home, away, colors):
         '<div class="forecast-win-bar" aria-hidden="true">'
         f'<span style="width:{result["away_win"]:.6%};background:{colors[away]}"></span>'
         f'<span style="width:{result["home_win"]:.6%};background:{colors[home]}"></span></div>'
+        f'<small class="forecast-total">Projected total · <b>{result["total"]:.1f} points</b></small>'
     )
 
 
-def forecast_margin_chart(result, home, away, colors):
+def forecast_margin_chart(result, home, away, colors, actual_margin=None, spread=None):
     import plotly.graph_objects as go
 
     margin = result["margin"]
     low = result["distribution"]["low"]
     high = result["distribution"]["high"]
-    extent = max(abs(low), abs(high), abs(margin), 4) * 1.15
+    market_margin = -spread if spread is not None else None
+    positions = [low, high, margin, actual_margin, market_margin]
+    extent = max(4, *(abs(value) for value in positions if value is not None)) * 1.15
+    neutral = DARK_CHART["text"] if dark() else "#526570"
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=[low, high], y=[0, 0], mode="lines+markers",
-        line=dict(color="#637783", width=5), marker=dict(size=8),
+        line=dict(color=neutral, width=4), marker=dict(size=8),
         text=[forecast_margin_label(value, home, away, 0) for value in (low, high)],
         hovertemplate="%{text}<extra>80% range endpoint</extra>",
     ))
@@ -1004,12 +1050,53 @@ def forecast_margin_chart(result, home, away, colors):
         marker=dict(symbol="diamond", size=13, color=colors[home if margin >= 0 else away]),
         hovertemplate=f"{forecast_margin_label(margin, home, away)}<extra>Projected margin</extra>",
     ))
+    rows = ["Forecast"]
+    if actual_margin is not None:
+        rows.append("Actual")
+        fig.add_trace(go.Scatter(
+            x=[actual_margin], y=[-1], mode="markers",
+            marker=dict(symbol="circle", size=15, color=forecast_result_colors()[0]),
+            name="Actual",
+            hovertemplate=f"{forecast_margin_label(actual_margin, home, away, 0)}<extra>Actual margin</extra>",
+        ))
+    if market_margin is not None:
+        near_marker = min(abs(market_margin - value) for value in (margin, low, high)) < extent * .07
+        fig.add_trace(go.Scatter(
+            x=[market_margin], y=[.25 if near_marker else 0], mode="markers",
+            marker=dict(symbol="square-open", size=12, color=neutral),
+            name="Spread", hovertemplate=f"{home} {spread:+g}<extra>Home spread</extra>",
+        ))
+    fig.update_yaxes(
+        tickvals=list(range(0, -len(rows), -1)), ticktext=rows,
+        range=[.45 - len(rows), .55], fixedrange=True, showgrid=False, zeroline=False,
+    )
     fig.add_vline(x=0, line_color="#697681", line_dash="dot")
     fig.update_xaxes(range=[-extent, extent], title_text="Away advantage  ←  Point margin  →  Home advantage",
                      tickformat=".0f")
-    fig.update_yaxes(visible=False, range=[-1, 1], fixedrange=True)
-    fig.update_layout(height=150, margin=dict(l=24, r=24, t=12, b=48), showlegend=False)
+    fig.update_layout(height=155 + 36 * (len(rows) - 1), margin=dict(l=68, r=16, t=12, b=48), showlegend=False)
     return fig
+
+
+def forecast_margin_key(result, home, away, projection_color, actual_margin, spread):
+    margin = result["margin"]
+    dist = result["distribution"]
+    low, high = (forecast_margin_label(dist[edge], home, away, 0) for edge in ("low", "high"))
+    neutral = DARK_CHART["text"] if dark() else "#526570"
+    entries = [
+        ("◆", "Projected", forecast_margin_label(margin, home, away), projection_color),
+        ("━", "80% range", f"{low} to {high}", neutral),
+    ]
+    if actual_margin is not None:
+        entries.append(("●", "Actual", forecast_margin_label(actual_margin, home, away, 0), forecast_result_colors()[0]))
+    if spread is not None:
+        entries.append(("□", "Spread", f"{home} {spread:+g}", neutral))
+    entries.append(("⋮", "Even score", "0 points", "#8b969e"))
+    items = "".join(
+        f'<span><span class="forecast-margin-symbol" style="--cue:{color}" aria-hidden="true">{symbol}</span>'
+        f'<span><b>{escape(label)}</b> · {escape(value)}</span></span>'
+        for symbol, label, value, color in entries
+    )
+    st.html(f'<div class="forecast-margin-key" aria-label="Point margin chart key">{items}</div>')
 
 
 def team_recent_form(team_games, home_id, away_id, when, names, colors):
@@ -1055,14 +1142,18 @@ def team_recent_form(team_games, home_id, away_id, when, names, colors):
     fig = px.line(
         recent, x="date", y="margin", color="team_name", markers=True, color_discrete_map=colors,
         line_dash="team_name", line_dash_map={names[away_id]: "dash", names[home_id]: "solid"},
-        hover_data=["opponent", "game_result"],
-        labels={"date": "Game date", "team_name": "Team", "margin": "Scoring margin (points)",
-                "opponent": "Opponent", "game_result": "Final score"},
+        custom_data=["team_name", "opponent", "game_result"],
+        labels={"date": "Game date", "team_name": "Team", "margin": "Scoring margin (points)"},
+    )
+    fig.update_traces(
+        hovertemplate="<b>%{customdata[0]} %{customdata[1]}</b><br>"
+                      "%{x|%b %d, %Y}<br>"
+                      "%{customdata[2]} · Margin %{y:+.0f} pts<extra></extra>"
     )
     fig.add_hline(y=0, line_color="#697681", line_dash="dot")
     fig.update_layout(height=350, margin=dict(l=45, r=15, t=40, b=52),
                       legend=dict(orientation="h", y=1.14, x=0))
-    fig.update_yaxes(tickformat=".0f", hoverformat="+.0f")
+    fig.update_yaxes(tickformat=".0f")
     show_chart(fig, use_container_width=True)
 
 
@@ -1194,21 +1285,37 @@ def team_actual_result(version, home_id, away_id, when):
     return matches.iloc[0] if len(matches) == 1 else None
 
 
+def forecast_result_colors():
+    return ("#7fdfbe", "#ffb68b") if dark() else ("#12694f", "#9a3c14")
+
+
 def forecast_actual_score(actual, home, away, forecast):
-    st.write(f"**Actual final** · {away} {actual.away_points:.0f} · {home} {actual.home_points:.0f}")
-    if forecast is None:
-        return
-    home_chance = round(100 * forecast["home_win"], 1)
-    away_chance = round(100 * forecast["away_win"], 1)
-    if home_chance == away_chance:
-        st.caption("The forecast gave both teams the same displayed win chance.")
-        return
-    favorite = home if home_chance > away_chance else away
     winner = home if actual.home_points > actual.away_points else away
-    if favorite == winner:
-        st.caption(f"{favorite}, the forecast favorite, won.")
-    else:
-        st.caption(f"{winner} won. The forecast favored {favorite}.")
+    scores = []
+    for name, points in ((away, actual.away_points), (home, actual.home_points)):
+        score = f"{escape(name)} {points:.0f}"
+        if name == winner:
+            score = f'<strong class="forecast-winner">{score}<small class="forecast-winner-label">Winner</small></strong>'
+        scores.append(f"<span>{score}</span>")
+    score_line = '<span aria-hidden="true">·</span>'.join(scores)
+    verdict = ""
+    outcome = "even"
+    if forecast is not None:
+        home_chance, away_chance = forecast["home_win"], forecast["away_win"]
+        if home_chance == away_chance:
+            verdict = "Equal win chances"
+        else:
+            favorite = home if home_chance > away_chance else away
+            correct = favorite == winner
+            outcome = "correct" if correct else "missed"
+            verdict = "✓ Model correctly picked the winner" if correct else "✕ Model picked the wrong winner"
+    badge = f'<span class="forecast-verdict" data-result="{outcome}">{verdict}</span>' if verdict else ""
+    win_color, miss_color = forecast_result_colors()
+    st.html(
+        f'<div class="forecast-result" style="--result-win:{win_color};--result-miss:{miss_color}">'
+        f'<div class="forecast-final-heading"><h4>Final score</h4>{badge}</div>'
+        f'<div class="forecast-result-scores">{score_line}</div></div>'
+    )
 
 
 @st.cache_data(show_spinner=False)
@@ -1303,22 +1410,29 @@ def team_page(t, teams, version):
     if matchup_choice is None:
         return
     h, a, when = matchup_choice
-    st.caption(f"Forecast uses box scores before game day, available through {t.date.max():%b %d, %Y}.")
+    if st.session_state.get("team_matchup_mode") == "Past Games":
+        st.caption(f"This forecast uses only box scores from games played before {when:%b} {when.day}, {when.year}.")
+    else:
+        st.caption(f"Forecast uses box scores before game day, available through {t.date.max():%b %d, %Y}.")
     home, away = names[h], names[a]
     home_color, away_color = pair_colors(teams, h, a)
     colors = {away: away_color, home: home_color}
     actual = team_actual_result(version, h, a, when)
 
+    forecast_summary = st.container()
     spread_toggle, spread_input = st.columns([1, 1.3], vertical_alignment="bottom")
+    margin_heading = spread_toggle.empty()
     use_spread = spread_toggle.toggle("Include home spread", key="team_use_spread",
-                                      help="Adds the projected margin, its likely range and each side's chance to cover.")
-    spread = None
-    if use_spread:
-        spread = spread_input.number_input("Home spread", value=-4.5, step=.5, key="team_spread",
-                                           help="Negative means the home team is favored. −4.5 means it must win by 5 or more to cover.")
+                                      help="Adds a spread marker and each side’s chance to cover.")
+    spread_value = spread_input.number_input(
+        "Home spread", min_value=-60.0, max_value=60.0, value=-4.5, step=.5,
+        key="team_spread", disabled=not use_spread,
+        help="Enter a spread from −60 to +60. At −4.5, the home team must win by 5 or more to cover.",
+    )
+    spread = spread_value if use_spread else None
 
     result = None
-    progress = st.progress(0, text="Loading the forecast model…")
+    progress = forecast_summary.progress(0, text="Loading the forecast model…")
     try:
         model_path = APP.parent / "artifacts" / "team.pkl"
         modified = model_path.stat().st_mtime_ns
@@ -1327,34 +1441,31 @@ def team_page(t, teams, version):
         result = cached_team_forecast(version, modified, h, a, when, spread)
         progress.progress(100, text="Forecast ready")
     except (ValueError, FileNotFoundError) as exc:
-        st.warning(str(exc))
+        forecast_summary.warning(str(exc))
     finally:
         progress.empty()
 
     if result is not None:
-        st.subheader("Historical forecast" if actual is not None else "Matchup at a glance")
-        forecast_scoreboard(result, home, away, colors)
-        if actual is not None:
-            forecast_actual_score(actual, home, away, result)
-        st.write(f"**Projected total:** {result['total']:.1f} points")
-        if result["disagreement"]:
-            st.info("The projected score and the win chances favor different teams. Each comes from a separate model.")
+        with forecast_summary:
+            st.subheader("Historical forecast" if actual is not None else "Matchup at a glance")
+            forecast_scoreboard(result, home, away, colors)
+            if actual is not None:
+                forecast_actual_score(actual, home, away, result)
+            if result["disagreement"]:
+                st.info("The projected score and the win chances favor different teams. Each comes from a separate model.")
+        margin_heading.subheader("Point margin")
+        dist = result["distribution"]
+        actual_margin = actual.home_points - actual.away_points if actual is not None else None
+        codes = teams.set_index("team_id").team_code.to_dict()
+        projection_color = colors[home if result["margin"] >= 0 else away]
+        forecast_margin_key(result, codes[h], codes[a], projection_color, actual_margin, spread)
+        show_chart(forecast_margin_chart(result, home, away, colors, actual_margin, spread))
         if spread is not None:
-            st.subheader("Against the spread")
-            dist = result["distribution"]
-            st.write(f"**{home} {spread:+g}** · Home covers {dist['home_cover']:.0%} · "
+            st.write(f"**Spread outcomes** · Home covers {dist['home_cover']:.0%} · "
                      f"Away covers {dist['away_cover']:.0%} · Push {dist['push']:.0%}")
-            st.write(f"**Projected margin:** {forecast_margin_label(result['margin'], home, away)}")
-            low = forecast_margin_label(dist["low"], home, away, 0)
-            high = forecast_margin_label(dist["high"], home, away, 0)
-            st.write(f"Likely range (8 in 10 games like this one land here): **{low} to {high}**")
-            show_chart(forecast_margin_chart(result, home, away, colors))
-            st.caption("The diamond marks the projected margin and the dotted line an even score."
-                       + (" The range includes wins for either team." if dist["low"] < 0 < dist["high"] else ""))
-        else:
-            st.caption("Turn on **Include home spread** to see the projected margin, its likely range and cover chances.")
     elif actual is not None:
-        forecast_actual_score(actual, home, away, None)
+        with forecast_summary:
+            forecast_actual_score(actual, home, away, None)
 
     odds = APP / "odds_today.csv"
     with st.expander("Today's market lines"):
