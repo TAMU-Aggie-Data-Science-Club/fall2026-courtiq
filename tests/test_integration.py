@@ -236,6 +236,16 @@ class RealTests(unittest.TestCase):
         self.assertEqual(cards.count('class="ciq-card"'), 2)
         for label in ("PTS", "REB", "AST"):
             self.assertEqual(cards.count(f"<b>{label}</b>"), 2)
+        charts = [json.loads(item.proto.spec) for item in at.get("plotly_chart")]
+        self.assertEqual([chart["layout"]["title"]["text"] for chart in charts], ["Points", "Rebounds", "Assists"])
+        for chart in charts:
+            bars, away_range, home_range, average = chart["data"][:4]
+            self.assertEqual(bars["orientation"], "h")
+            self.assertEqual(average["marker"]["symbol"], "circle-open")
+            for whisker in (away_range, home_range):
+                start, end, _, left_cap, _, _, right_cap, _ = whisker["x"]
+                self.assertEqual((start, end), (left_cap, right_cap))
+            self.assertEqual(chart["layout"]["xaxis"]["ticks"], "outside")
         self.assertTrue(any(item.value == "Past meetings" for item in at.subheader))
 
     def test_team_forecast_custom_spread_and_recent_window(self):

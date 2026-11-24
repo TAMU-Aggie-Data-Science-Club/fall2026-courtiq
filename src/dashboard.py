@@ -162,7 +162,7 @@ def show_chart(fig, **kwargs):
     st.plotly_chart(fig, **kwargs)
 
 
-def html_table(frame, *, numeric=(), highlight=None, groups=None, gap_before=None, headers=None):
+def html_table(frame, *, numeric=(), highlight=None, groups=None, gap_before=None, headers=None, higher=None):
     """Readable, theme-aware table. `highlight` marks rows (e.g. the selected player);
     `groups` is an optional list of (label, span) header groups; `gap_before` inserts a
     '…' row before that row position to show the list skips ahead."""
@@ -180,11 +180,14 @@ def html_table(frame, *, numeric=(), highlight=None, groups=None, gap_before=Non
         if gap_before is not None and position == gap_before:
             rows.append(f'<tr class="is-gap"><td colspan="{len(frame.columns)}">⋯</td></tr>')
         selected = highlight is not None and bool(highlight[position])
-        cells = "".join(
-            f'<td class="{"num" if col in numeric else ""}">{escape("—" if pd.isna(value) else str(value))}</td>'
-            for col, value in record.items())
+        cells = []
+        for col, value in record.items():
+            label = escape("—" if pd.isna(value) else str(value))
+            if higher is not None and col in higher and higher[col][position]:
+                label = f'<strong class="player-stat-edge">{label}</strong>'
+            cells.append(f'<td class="{"num" if col in numeric else ""}">{label}</td>')
         row_class = ' class="is-selected"' if selected else ""
-        rows.append(f"<tr{row_class}>{cells}</tr>")
+        rows.append(f'<tr{row_class}>{"".join(cells)}</tr>')
     st.html(f'<div class="ciq-table-wrap"><table class="ciq-table"><thead>{head}</thead>'
             f'<tbody>{"".join(rows)}</tbody></table></div>')
 
@@ -1575,18 +1578,99 @@ def player_accuracy(version):
 STAT_ABBR = {"points": "PTS", "rebounds": "REB", "assists": "AST"}
 
 
-def player_card(name, team, side, color, frame):
+def player_card(name, team, side, color, frame, actual=None):
     stats = []
     for row in frame.itertuples():
+        actual_label = ""
+        if actual is not None:
+            value = actual[row.stat]
+            actual_label = f'<span class="player-actual">Actual {value:.0f}</span>' if pd.notna(value) else '<span>Actual —</span>'
         stats.append(
             f'<div class="ciq-stat"><b>{STAT_ABBR.get(row.stat, escape(row.stat.upper()))}</b><strong>{row.prediction:.1f}</strong>'
-            f'<span>Range {row.low:.0f}–{row.high:.0f}</span><span>Last-10 avg {row.baseline:.1f}</span></div>')
+            f'<span>Range {row.low:.0f}–{row.high:.0f}</span><span>Last-10 avg {row.baseline:.1f}</span>{actual_label}</div>')
+    appearance = ""
+    if actual is not None and not actual["played"]:
+        appearance = '<small class="player-appearance">No appearance recorded</small>'
     return (f'<article class="ciq-card" style="--accent:{color}"><small>{side} · {escape(team)}</small>'
-            f'<h4>{escape(name)}</h4><div class="ciq-stat-row">{"".join(stats)}</div></article>')
+            f'<h4>{escape(name)}</h4>'
+            f'<div class="ciq-stat-row">{"".join(stats)}</div>{appearance}</article>')
+
+
+def player_projection_charts(sides, recent_baselines, actual=None):
+    import plotly.graph_objects as go
+
+    ink = DARK_CHART["text"] if dark() else "#334651"
+    grid = DARK_CHART["grid"] if dark() else "#e0e4e7"
+    labels = [name for name, _, _ in sides]
+    by_stat = [frame.set_index("stat") for _, _, frame in sides]
+    average = "**last-10 average**"
+    if recent_baselines.isna().any().any():
+        average += " (or the training average if unavailable)"
+    st.caption(
+        f"Bars show the **projection**, circles mark the {average}, "
+        "and capped lines show the **likely range (80%)**."
+        + (" Green diamonds mark **actual results**." if actual is not None and actual[list(STAT_ABBR)].notna().any().any() else "")
+    )
+    for stat in STAT_ABBR:
+        values = [frame.loc[stat] for frame in by_stat]
+        baseline_labels = ["Last-10 average" if pd.notna(value) else "Training average"
+                           for value in recent_baselines[stat]]
+        figure = go.Figure(go.Bar(
+            x=[row.prediction for row in values], y=[1, 0], orientation="h", width=.48,
+            marker_color=[color for _, color, _ in sides], opacity=.65,
+            customdata=[[label, row.baseline, row.low, row.high, baseline_label]
+                        for label, row, baseline_label in zip(labels, values, baseline_labels)],
+            hovertemplate="<b>%{customdata[0]}</b><br>Projection: %{x:.1f}<br>"
+                          "%{customdata[4]}: %{customdata[1]:.1f}<br>"
+                          "80% range: %{customdata[2]:.1f}–%{customdata[3]:.1f}<extra></extra>",
+        ))
+        for y, row in zip((1, 0), values):
+            figure.add_trace(go.Scatter(
+                x=[row.low, row.high, None, row.low, row.low, None, row.high, row.high],
+                y=[y, y, None, y - .10, y + .10, None, y - .10, y + .10],
+                mode="lines", line=dict(color=ink, width=2), hoverinfo="skip",
+            ))
+        figure.add_trace(go.Scatter(
+            x=[row.baseline for row in values], y=[1, 0], mode="markers",
+            marker=dict(symbol="circle-open", size=12, color=ink, line=dict(width=2)),
+            customdata=list(zip(labels, baseline_labels)),
+            hovertemplate="<b>%{customdata[0]}</b><br>%{customdata[1]}: %{x:.1f}<extra></extra>",
+        ))
+        maximum = max(1, *(max(row.prediction, row.baseline, row.high) for row in values))
+        if actual is not None:
+            actual_points = [(value, y, label) for value, y, label in zip(actual[stat], (1, 0), labels) if pd.notna(value)]
+            if actual_points:
+                scores, levels, names = zip(*actual_points)
+                maximum = max(maximum, *scores)
+                figure.add_trace(go.Scatter(
+                    x=scores, y=[y + .26 for y in levels], mode="markers", name="Actual",
+                    marker=dict(symbol="diamond", size=11, color=forecast_result_colors()[0]), cliponaxis=False,
+                    text=names, hovertemplate="<b>%{text}</b><br>Actual: %{x:.0f}<extra></extra>",
+                ))
+        figure.update_layout(
+            title=dict(text=stat.title(), x=.02, font=dict(size=15)), height=178,
+            margin=dict(l=15, r=20, t=32, b=28), showlegend=False,
+        )
+        figure.update_xaxes(range=[0, maximum * 1.08], nticks=7, showgrid=True, gridcolor=grid,
+                            ticks="outside", tickformat="~g", fixedrange=True)
+        figure.update_yaxes(tickvals=[1, 0], ticktext=labels, range=[-.55, 1.55], showgrid=False,
+                            automargin=True, fixedrange=True)
+        show_chart(figure, theme=None, config={"displayModeBar": False})
 
 
 def player_page(p, t, teams, version):
     st.html(TEAM_FORECAST_STYLE)
+    edge_color = "#7fdfbe" if dark() else "#12694f"
+    st.html(f"""<style>
+    .ciq-table strong.player-stat-edge {{
+        display:inline-block; white-space:nowrap; padding:.06rem .32rem; border-radius:.3rem;
+        color:{edge_color} !important;
+        background:color-mix(in srgb,{edge_color} 14%,transparent);
+        border:1px solid color-mix(in srgb,{edge_color} 42%,transparent);
+    }}
+    .ciq-stat .player-actual {{color:{edge_color};font-weight:700;margin-top:.3rem;}}
+    .player-appearance {{display:block;margin-top:.25rem;}}
+    </style>""")
     st.header("Player Matchups")
     page_intro("Pick a game, then one player from each team, to compare their projected points, rebounds and assists.",
                ["Find a game", "Pick a player on each team", "Compare projections and past meetings"])
@@ -1633,25 +1717,27 @@ def player_page(p, t, teams, version):
 
     if left is not None and right is not None:
         st.subheader("Projected stat line")
+        game = team_actual_result(version, home, away, when)
+        actual = None
+        if game is not None:
+            selected_teams = {b: away, a: home}
+            game_rows = p.loc[p.game_id.eq(game.game_id) & p.played & p.player_id.isin(selected_teams)]
+            game_rows = game_rows.loc[game_rows.team_id.eq(game_rows.player_id.map(selected_teams))]
+            actual = game_rows.set_index("player_id")[["played", *STAT_ABBR]].reindex([b, a])
+            actual["played"] = actual["played"].eq(True)
+        away_actual, home_actual = (actual.loc[b], actual.loc[a]) if actual is not None else (None, None)
         st.html('<div class="ciq-cards">'
-                + player_card(player_names[b], names[away], "Away", away_color, right)
-                + player_card(player_names[a], names[home], "Home", home_color, left) + "</div>")
-        result = pd.concat([right.assign(player=player_names[b]), left.assign(player=player_names[a])])
-        result["stat"] = result.stat.str.title()
-        result["upper"] = result.high - result.prediction
-        result["lower"] = result.prediction - result.low
-        chart = px.bar(result, x="stat", y="prediction", color="player", barmode="group",
-                       error_y="upper", error_y_minus="lower",
-                       color_discrete_map={player_names[a]: home_color, player_names[b]: away_color},
-                       hover_data={"baseline": ":.1f", "upper": False, "lower": False},
-                       labels={"stat": "Stat", "prediction": "Projected", "player": "Player",
-                               "baseline": "Last-10 average"})
-        chart.update_traces(marker_line_width=0, error_y_color="#5b6a74", error_y_thickness=1.6, error_y_width=7)
-        chart.update_layout(height=340, bargap=.3, bargroupgap=.08, legend=dict(orientation="h", y=1.12),
-                            margin=dict(l=40, r=15, t=30, b=40))
-        show_chart(chart)
-        st.caption("Bars show the projection; whiskers show the likely range (8 in 10 past games landed inside it). "
-                   "Last-10 average is each player's average over his previous 10 games this season.")
+                + player_card(player_names[b], names[away], "Away", away_color, right, away_actual)
+                + player_card(player_names[a], names[home], "Home", home_color, left, home_actual)
+                + "</div>")
+        season_start = when.year if when.month >= 7 else when.year - 1
+        same_season = ordered.loc[ordered.season_start.eq(season_start) & ordered.player_id.isin([b, a])]
+        recent_baselines = (same_season.groupby("player_id").tail(10)
+                            .groupby("player_id")[list(STAT_ABBR)].mean().reindex([b, a]))
+        player_projection_charts([
+            (player_names[b], away_color, right),
+            (player_names[a], home_color, left),
+        ], recent_baselines, actual)
 
     meetings = player_meetings(p, b, a, when)
     st.subheader("Past meetings")
@@ -1661,15 +1747,20 @@ def player_page(p, t, teams, version):
     else:
         st.write(f"**{len(meetings)}** earlier {'game' if len(meetings) == 1 else 'games'} with both players "
                  "on opposite teams, newest first.")
+        st.caption("Boxed values mark the higher stat in each game.")
         display = pd.DataFrame({
             "date": meetings.date.map(lambda d: f"{d:%b} {d.day}, {d.year}"),
             "game": [f"{codes.get(x, '?')} vs {codes.get(y, '?')}" for x, y in zip(meetings.team_id_a, meetings.team_id_b)],
             **{f"{stat}_{side}": meetings[f"{stat}_{side}"].map(lambda v: "—" if pd.isna(v) else f"{v:.0f}")
                for side in ("a", "b") for stat in ("points", "rebounds", "assists", "minutes")},
         })
+        higher = {
+            f"{stat}_{side}": meetings[f"{stat}_{side}"].gt(meetings[f"{stat}_{other}"]).fillna(False).tolist()
+            for stat in STAT_ABBR for side, other in (("a", "b"), ("b", "a"))
+        }
         html_table(display, headers=["Date", "Teams", *(["PTS", "REB", "AST", "MIN"] * 2)],
                    groups=[("", 2), (player_names[b], 4), (player_names[a], 4)],
-                   numeric=[c for c in display.columns if c[-2:] in ("_a", "_b")])
+                   numeric=[c for c in display.columns if c[-2:] in ("_a", "_b")], higher=higher)
         if len(meetings) < 3:
             st.caption("Only a few meetings, so treat these as anecdotes rather than a trend.")
     player_accuracy(version)
