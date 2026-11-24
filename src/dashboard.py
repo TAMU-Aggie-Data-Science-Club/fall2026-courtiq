@@ -1704,14 +1704,15 @@ def player_projection_charts(sides, recent_counts, actual=None):
                 ))
         figure.update_layout(
             title=dict(text=stat.title(), x=.5, font=dict(size=15)), height=320,
-            margin=dict(l=31, r=12, t=35, b=45), showlegend=False,
+            margin=dict(l=31, r=12, t=35, b=8), showlegend=False,
         )
-        figure.update_xaxes(tickvals=[0, 1], ticktext=labels, range=[-.55, 1.55],
-                            showgrid=False, automargin=True, fixedrange=True)
+        figure.update_xaxes(range=[-.5, 1.5], showticklabels=False, showgrid=False, fixedrange=True)
         figure.update_yaxes(range=[0, maximum * 1.08], nticks=6, showgrid=True, gridcolor=grid,
                             ticks="outside", tickformat="~g", fixedrange=True)
         with column:
             show_chart(figure, theme=None, config={"displayModeBar": False})
+            name_labels = "".join(f'<span>{escape(name)}</span>' for name in labels)
+            st.html(f'<div class="player-chart-labels">{name_labels}</div>')
 
 
 def player_page(p, t, teams, version):
@@ -1725,6 +1726,9 @@ def player_page(p, t, teams, version):
         border:1px solid color-mix(in srgb,{edge_color} 42%,transparent);
     }}
     .ciq-stat .player-actual {{color:{edge_color};font-weight:700;margin-top:.3rem;}}
+    .player-chart-labels {{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+        padding:0 12px 0 31px;margin-top:-.65rem;text-align:center;font-size:.82rem;line-height:1.25;}}
+    .player-chart-labels span {{padding:0 .2rem;overflow-wrap:anywhere;}}
     .player-card-team {{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .5rem;}}
     .player-projection-warning {{display:inline-block;padding:.1rem .45rem;border-radius:999px;
         font-size:.78rem;font-weight:650;color:{warning_color};
@@ -1869,8 +1873,7 @@ def player_page(p, t, teams, version):
     meetings = player_meetings(p, b, a, when)
     st.subheader("Past meetings")
     if meetings.empty:
-        st.info(f"{player_names[a]} and {player_names[b]} haven't played against each other in this snapshot. "
-                "The projections rely on each player's recent games and the opposing team's defense.")
+        st.info(f"{player_names[a]} and {player_names[b]} haven't played against each other in this snapshot.")
     else:
         st.write(f"**{len(meetings)}** earlier {'game' if len(meetings) == 1 else 'games'} with both players "
                  "on opposite teams, newest first.")

@@ -246,6 +246,10 @@ class RealTests(unittest.TestCase):
                 low, high, _, low_cap, _, _, high_cap, _ = whisker["y"]
                 self.assertEqual((low, high), (low_cap, high_cap))
             self.assertEqual(chart["layout"]["yaxis"]["ticks"], "outside")
+            self.assertFalse(chart["layout"]["xaxis"]["showticklabels"])
+        label_rows = [item.proto.body for item in at.get("html") if 'class="player-chart-labels"' in item.proto.body]
+        self.assertEqual(len(label_rows), 3)
+        self.assertTrue(all(row.count("<span>") == 2 for row in label_rows))
         self.assertTrue(any(item.value == "Past meetings" for item in at.subheader))
 
     def test_team_forecast_custom_spread_and_recent_window(self):
