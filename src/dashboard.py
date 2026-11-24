@@ -275,14 +275,32 @@ def choose(frame,key,label="Player"):
     return st.selectbox(label,list(names),format_func=names.get,key=key)
 
 
-def methodology(manifest):
-    with st.expander("Sources, definitions & limitations"):
-        st.markdown(f"[NBA box scores]({SOURCE_NBA}) · [Historical betting data]({SOURCE_ODDS}) · [The Odds API](https://the-odds-api.com/)")
-        st.write(f"Dataset version {manifest['version']}; built {manifest['built_at']}. Source coverage is the supplied download, not a live NBA feed.")
-        st.write("CourtIQ qualification: 20 played games & 15 minutes/game. Shooting percentiles need 50 attempts. Rankings use all eligible players in that season, not just the Top 50. Missing is not zero.")
-        st.write("Box scores do not identify guarding assignments, injuries or confirmed active rosters. On/off is observational and reflects teammates and opponents.")
-        st.write("2024-25 has source coverage omissions. Four current-season games lack duration/player-minute coverage; those values remain unavailable. DNP comparisons use only explicit rows.")
-        st.write("Historical line timing is unknown. Market comparisons are retrospective, not a demonstrated trading strategy. Predictions are educational statistical estimates; actual outcomes may differ.")
+def sources_and_limitations(page):
+    notes = {
+        "scouting-lab": (
+            "**Coverage** — The date near the filters gives the latest recorded player game for the selected season. Some games are missing, including in 2024–25.",
+            "**Rankings** — Percentiles depend on who qualifies. Box scores capture only part of a defender’s contribution, and defensive and net ratings also reflect teammates and opponents.",
+        ),
+        "on-off-impact": (
+            "**Coverage** — Games with missing duration or player minutes can reduce the on/off sample.",
+            "**Interpreting impact** — Teammates, opponents, and rotations influence scoring margins. The splits describe how the team performed during the recorded minutes.",
+        ),
+        "team-forecasts": (
+            "**Forecasts** — Estimates use earlier games from the available snapshot. Injuries and lineup changes can affect the actual outcome.",
+            f"**Market lines** — Current lines are shown when a cached snapshot is available. The timing of historical lines is unknown. [The Odds API](https://the-odds-api.com/) · [Historical betting data]({SOURCE_ODDS})",
+        ),
+        "player-matchups": (
+            "**Availability** — Recorded player appearances cannot confirm future lineups or injuries.",
+            "**Past meetings** — Box scores show how both players performed in the same game. Minutes, roles, and shooting variance can matter a lot in a small sample, and the data doesn’t identify who guarded whom.",
+        ),
+        "breakout-watch": (
+            "**Preseason estimates** — Forecasts use the prior completed season. The tracker uses available season box scores, and early results can shift as more games are recorded.",
+            "**Historical evaluation** — The backtest shows performance for one held-out season. Individual breakout chances describe model estimates.",
+        ),
+    }
+    source = f"**Box scores** — This tool uses the NBA records in CourtIQ’s data snapshot. [Historical NBA box scores]({SOURCE_NBA})"
+    with st.expander("Sources & limitations"):
+        st.markdown("\n".join(f"- {item}" for item in (source, *notes[page])))
 
 
 @st.cache_data
@@ -418,9 +436,9 @@ def scouting_advanced_stats(row):
 
 
 def scouting_sources():
-    with st.expander("Sources and how to read the rankings"):
+    with st.expander("How to read the rankings"):
         comparison, production, shooting, defense, advanced, badges = st.tabs(
-            ["Rankings & sources", "Game stats", "Shooting", "Defense & rebounding", "Advanced stats", "Badges"]
+            ["Rankings", "Game stats", "Shooting", "Defense & rebounding", "Advanced stats", "Badges"]
         )
         with comparison:
             st.markdown(
@@ -430,7 +448,6 @@ def scouting_sources():
 - **Rank** — Rank 1 is the highest value for most stats. Defensive Rating and Foul Avoidance rank lower raw values first. “Rank 12 of 230” means 230 players qualified for that stat. Ties share the average of their positions. 👑 marks rank 1 when standard rankings apply.
 - **Percentile** — Places a player's value on a 0–100 scale within that stat's eligible group. A 90th percentile is near the top tenth. The page rounds percentile labels to whole numbers.
 - **Unranked** — The player missed a qualification cutoff or the stat was unavailable. Look under the stat for the reason.
-- **Coverage** — The date near the filters shows the latest player game in the selected season. The snapshot preparation date is recorded in CourtIQ. The original download date is unavailable. Some games are missing, including in 2024–25. The latest season may be in progress. [Historical NBA box scores]({SOURCE_NBA})
                 """
             )
         with production:
@@ -529,6 +546,9 @@ def scouting_defense_cohort(league, ratings_modified):
 def scouting_page(seasons, teams, manifest):
     st.html(SCOUT_STYLE)
     st.header("Player Scouting Lab")
+    page_intro("Explore a player’s strengths and weaknesses relative to eligible NBA players.",
+               ["Pick a season and search for a player", "Choose a scouting lens",
+                "Read the radar chart to compare the player with eligible peers"])
     available = sorted(seasons.loc[seasons.season_start >= 2023, "season"].unique(), reverse=True)
     if not available:
         st.info("No player seasons are available.")
@@ -821,10 +841,9 @@ def impact_page(impacts, teams, manifest):
 
     st.html(IMPACT_STYLE)
     st.header("On/Off Impact")
-    st.write(
-        "See how a team scored relative to its opponents with a player on the court and on the bench. "
-        "Pick a season and player to see how those margins changed over time and how they compare across the league."
-    )
+    page_intro("See how a team scored relative to its opponents with a player on the court and on the bench.",
+               ["Pick a season, player, and team stint", "Compare on-court and bench scoring margins",
+                "Use the league scatterplot to compare qualifying stints"])
     available = sorted(impacts.loc[impacts.season_start.ge(2023), "season"].unique(), reverse=True)
     if not available:
         st.info("No on/off seasons are available.")
