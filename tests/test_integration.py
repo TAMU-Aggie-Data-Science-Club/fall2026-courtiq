@@ -154,6 +154,10 @@ class RealTests(unittest.TestCase):
         self.assertEqual(len(labels), 8)
         self.assertTrue(any("3PA per game" in label for label in labels))
         self.assertEqual(report_headings(), ["**Shooting scouting report**"])
+        at.button_group(key="scout_lens").set_value([]).run()
+        self.assertFalse(at.exception)
+        self.assertEqual(report_headings(), ["**Shooting scouting report**"])
+        self.assertEqual(at.session_state["scout_lens"], "Shooting")
 
         at.button_group(key="scout_lens").set_value(["Playmaking"]).run()
         playmaking_labels = radar()["layout"]["polar"]["angularaxis"]["ticktext"]

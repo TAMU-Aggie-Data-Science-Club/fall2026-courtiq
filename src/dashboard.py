@@ -39,6 +39,8 @@ def dark():
 
 SHARED_STYLE = """
 <style>
+[data-baseweb="calendar"][role="application"] [role="gridcell"][aria-label^="Choose"]:hover > div {
+    background:#f2d9c8 !important;color:#202c36 !important;border-radius:50%;}
 .ciq-table-wrap {overflow-x:auto; border:1px solid #8794a455; border-radius:.65rem; margin:.35rem 0 1rem;}
 .ciq-table {width:100%; border-collapse:collapse; font-size:.9rem;}
 .ciq-table th {text-align:left; font-weight:650; padding:.55rem .75rem; white-space:nowrap;
@@ -81,14 +83,45 @@ DARK_STYLE = """
 .stApp [data-baseweb="select"] > div, .stApp [data-baseweb="input"], .stApp [data-baseweb="input"] > div,
 .stApp [data-baseweb="base-input"], .stApp input, .stApp textarea {
     background:#1b2731 !important; color:#ece6da !important; border-color:#3a4a56 !important;}
+.stApp :is([data-baseweb="input"], [data-baseweb="select"] > div):focus-within,
+.stApp :is(input, textarea):focus {
+    outline:2px solid #f2a46f; outline-offset:1px;}
+.stApp :is([data-baseweb="input"], [data-baseweb="select"]):focus-within input:focus {
+    outline:none;}
 .stApp [data-baseweb="select"] svg, .stApp [data-testid="stNumberInput"] button svg {fill:#ece6da; color:#ece6da;}
 .stApp [data-testid="stNumberInput"] button {background:#22313c; color:#ece6da; border-color:#3a4a56;}
 [data-baseweb="popover"] > div, [data-baseweb="menu"], [data-baseweb="popover"] ul, [role="listbox"],
 [data-baseweb="calendar"], [data-baseweb="calendar"] > div, [data-testid="stPopoverBody"] {
     background:#1b2731 !important; color:#ece6da !important;}
-[role="option"], [role="option"] *, [data-baseweb="calendar"] * {color:#ece6da !important;}
+[role="option"], [role="option"] * {color:#ece6da !important;}
 [role="option"]:hover, [role="option"][aria-selected="true"] {background:#2a3b47 !important;}
-[data-baseweb="calendar"] [aria-selected="true"] div {background:#b54b1c !important;}
+[data-baseweb="calendar"][role="application"] {
+    color-scheme:dark;background:#1b2731 !important;color:#ece6da !important;}
+[data-baseweb="popover"]:has([data-baseweb="calendar"]) {
+    background:#1b2731 !important;}
+[data-baseweb="calendar"][role="application"] :where(div,span) {
+    background:transparent !important;color:inherit;}
+[data-baseweb="calendar"][role="application"] :where([role="columnheader"],[aria-hidden="true"]) {
+    color:#b9c2c8;}
+[data-baseweb="calendar"][role="application"] svg {color:currentColor;fill:currentColor;}
+[data-baseweb="calendar"][role="application"] :is(button,[role="gridcell"],[role="button"]) {
+    color:#ece6da !important;background:transparent !important;}
+[data-baseweb="calendar"][role="application"] :is(button,[role="button"]):hover {
+    background:#2a3b47 !important;}
+/* Paint day states directly so the light-theme pseudo-elements cannot cover them. */
+[data-baseweb="calendar"][role="application"] [role="gridcell"]::before,
+[data-baseweb="calendar"][role="application"] [role="gridcell"]::after {
+    display:none !important;}
+[data-baseweb="calendar"][role="application"] [role="row"],
+[data-baseweb="calendar"][role="application"] [role="gridcell"]:empty {
+    background:#1b2731 !important;box-shadow:none !important;}
+[data-baseweb="calendar"][role="application"] [role="gridcell"][aria-label^="Choose"]:hover > div {
+    background:#385366 !important;color:#fff7ed !important;}
+[data-baseweb="calendar"][role="application"] [role="gridcell"][aria-label^="Selected"] > div {
+    background:#a8441a !important;color:#fff7ed !important;border-radius:50%;}
+[data-baseweb="calendar"][role="application"] :is([aria-label^="Not available"],[aria-disabled="true"],:disabled) {
+    color:#81909b !important;}
+[data-baseweb="calendar"][role="application"] :focus-visible {outline:2px solid #f2a46f;outline-offset:1px;}
 .stApp [data-testid="stExpander"] details {background:#16222b; border-color:#34444f;}
 .stApp [data-testid="stExpander"] summary {background:#16222b !important; color:#ece6da !important;}
 .stApp [data-testid="stExpander"] summary:hover {background:#1d2b35 !important;}
@@ -106,7 +139,20 @@ DARK_STYLE = """
 .stApp [data-testid="stMain"] [data-testid="stBaseButton-pillsActive"] {
     background:color-mix(in srgb,#e08b4f 22%,#1b2731) !important; color:#ffd8bd !important; border-color:#e08b4f !important;}
 .stApp [data-testid="stMain"] [data-testid="stBaseButton-segmented_controlActive"] p {color:#ffd8bd !important;}
-.stApp [data-testid="stAlert"] > div {background:#1d2b35 !important; color:#ece6da;}
+.stApp :is([data-testid="stMain"],[data-testid="stSidebar"],[data-testid="stHeader"])
+button:is([kind^="secondary"],[kind^="primary"],[data-testid^="stBaseButton"],[data-testid="stPopoverButton"]):not(:disabled):hover,
+[data-testid="stPopoverBody"] button:not(:disabled):hover,
+.stApp [data-testid="stNumberInput"] button:not(:disabled):hover {
+    box-shadow:inset 0 0 0 1px #8794a4;}
+.stApp :is(.st-key-team_swap_sides,.st-key-player_swap_sides) button,
+.stApp :is(.st-key-team_swap_sides,.st-key-player_swap_sides) button:is(:hover,:active,:focus) {
+    background:#1b2731 !important;color:#ece6da !important;border-color:#3a4a56 !important;}
+.stApp [data-testid="stAlert"] [data-testid="stAlertContainer"] {
+    background:var(--alert-bg,#1d2b35) !important;border-inline-start:3px solid var(--alert-accent,#8794a4);}
+.stApp [data-testid="stAlertContainer"]:has([data-testid="stAlertContentInfo"]) {
+    --alert-bg:#193449;--alert-accent:#74b9f3;}
+.stApp [data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]) {
+    --alert-bg:#3c2d1a;--alert-accent:#ffc477;}
 .stApp [data-testid="stAlert"] * {color:#ece6da;}
 .stApp [data-testid="stMain"] label[data-baseweb="radio"]:not(:has(input:checked)) > div:first-child {
     background-color:#1b2731 !important; border:2px solid #7d8a93 !important;}
@@ -116,6 +162,10 @@ DARK_STYLE = """
     background-color:#121b22 !important;}
 .stApp [data-testid="stSlider"] [data-testid="stSliderTickBarMin"], .stApp [data-testid="stSlider"] [data-testid="stSliderTickBarMax"] {color:#b9c2c8;}
 .stApp [data-testid="stMain"] [data-testid="stCheckbox"] label span:first-child {border-color:#a7b1b8;}
+.stApp .st-key-team_use_spread label:has(> input[type="checkbox"]:not(:checked):not(:disabled)) > div:first-child {
+    background-color:#62798a !important;}
+.stApp .st-key-team_use_spread label:has(> input[type="checkbox"]:not(:checked):not(:disabled)):hover > div:first-child {
+    background-color:#728a9b !important;}
 .stApp [data-testid="stMain"] [data-testid="stProgress"] p {color:#ece6da;}
 .stApp hr {border-color:#34444f;}
 .stApp a {color:#f2a46f;}
@@ -135,7 +185,7 @@ def show_chart(fig, **kwargs):
     if dark():
         c = DARK_CHART
         fig.update_layout(paper_bgcolor=c["paper"], plot_bgcolor=c["plot"], font_color=c["text"],
-                          legend_font_color=c["text"], hoverlabel=dict(bgcolor="#1b2731", font_color=c["text"]))
+                          legend_font_color=c["text"])
         fig.update_xaxes(automargin=True, gridcolor=c["grid"], zerolinecolor=c["grid"], linecolor=c["grid"],
                          tickfont_color=c["muted"], title_font_color=c["text"])
         fig.update_yaxes(automargin=True, gridcolor=c["grid"], zerolinecolor=c["grid"], linecolor=c["grid"],
@@ -543,6 +593,14 @@ def scouting_defense_cohort(league, ratings_modified):
     return comparison
 
 
+def keep_scouting_lens_selected():
+    lens = st.session_state.get("scout_lens")
+    if lens is None:
+        st.session_state["scout_lens"] = st.session_state.get("last_scout_lens", "All-Around")
+    else:
+        st.session_state["last_scout_lens"] = lens
+
+
 def scouting_page(seasons, teams, manifest):
     st.html(SCOUT_STYLE)
     st.header("Player Scouting Lab")
@@ -656,10 +714,12 @@ def scouting_page(seasons, teams, manifest):
             "with at least 15 minutes per game played. With so few games, percentiles can be "
             "misleading and change sharply after a single game."
         )
+    if "scout_lens" not in st.session_state:
+        st.session_state["scout_lens"] = st.session_state.get("last_scout_lens", "All-Around")
     lens = st.segmented_control(
-        "Scouting lens", list(scouting.LENSES), default="All-Around",
-        selection_mode="single", key="scout_lens", width="stretch",
-    ) or "All-Around"
+        "Scouting lens", list(scouting.LENSES),
+        selection_mode="single", key="scout_lens", width="stretch", on_change=keep_scouting_lens_selected,
+    )
     breakdown = all_around
     report_title = "All-around scouting report"
     summary = all_around_summary
