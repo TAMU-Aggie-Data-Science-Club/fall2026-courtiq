@@ -9,6 +9,7 @@ import plotly.express as px
 import streamlit as st
 from src.pipeline import APP
 from src.features import scouting,impact
+from src.features.breakout import season_features
 
 SOURCE_NBA="https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores"
 SOURCE_ODDS="https://www.kaggle.com/datasets/cviaxmiwnptr/nba-betting-data-october-2007-to-june-2024"
@@ -162,7 +163,8 @@ def show_chart(fig, **kwargs):
     st.plotly_chart(fig, **kwargs)
 
 
-def html_table(frame, *, numeric=(), highlight=None, groups=None, gap_before=None, headers=None, higher=None):
+def html_table(frame, *, numeric=(), highlight=None, groups=None, gap_before=None, headers=None, higher=None,
+               stacked=()):
     """Readable, theme-aware table. `highlight` marks rows (e.g. the selected player);
     `groups` is an optional list of (label, span) header groups; `gap_before` inserts a
     '…' row before that row position to show the list skips ahead."""
@@ -182,7 +184,11 @@ def html_table(frame, *, numeric=(), highlight=None, groups=None, gap_before=Non
         selected = highlight is not None and bool(highlight[position])
         cells = []
         for col, value in record.items():
-            label = escape("—" if pd.isna(value) else str(value))
+            if col in stacked and isinstance(value, tuple):
+                primary, detail = value
+                label = f'<strong>{escape(primary)}</strong><small class="ciq-cell-detail">{escape(detail)}</small>'
+            else:
+                label = escape("—" if pd.isna(value) else str(value))
             if higher is not None and col in higher and higher[col][position]:
                 label = f'<strong class="player-stat-edge">{label}</strong>'
             cells.append(f'<td class="{"num" if col in numeric else ""}">{label}</td>')
@@ -1776,17 +1782,65 @@ def player_page(p, t, teams, version):
         )
 
 
-def breakout_accuracy(version):
+@st.cache_data(show_spinner=False)
+def breakout_history(seasons):
+    return season_features(seasons)
+
+
+def breakout_accuracy(version, history):
     path = APP / "backtest_breakout_breakout.csv.gz"
     if not path.exists():
         return
     test = table("backtest_breakout_breakout", version).query("period == 'test'")
-    top = test.nlargest(15, "prediction")
+    if test.empty:
+        return
+    test = test.sort_values("prediction", ascending=False, kind="stable").reset_index(drop=True)
+    test["rank"] = test.index + 1
+    top = test.head(15)
     hits = int(top.actual.sum())
     rate = test.actual.mean()
+    outcome_start = int(test.season_start.iloc[0])
+    outcome = f"{outcome_start}-{(outcome_start + 1) % 100:02d}"
+    baseline = f"{outcome_start - 1}-{outcome_start % 100:02d}"
+    st.subheader(f"How the model did in {outcome}")
+    st.write(f"The model ranked candidates using {baseline} stats, then checked who met all three breakout criteria in {outcome}.")
+    st.html(
+        '<div class="ciq-cards">'
+        '<article class="ciq-card breakout-score" style="--accent:#a8441a">'
+        f'<strong>{hits} of {len(top)}</strong><span>top picks broke out</span>'
+        '</article>'
+        '<article class="ciq-card breakout-score" style="--accent:#317aca">'
+        f'<strong>{rate:.1%}</strong><span>of all test players broke out '
+        f'({int(test.actual.sum())} of {len(test)})</span></article></div>'
+    )
+
+    def change(before, after):
+        if pd.isna(before) or pd.isna(after):
+            return "—"
+        return f"{after - before:+.1f}", f"{before:.1f} → {after:.1f}"
+
+    prior = history.loc[history.season_start.eq(outcome_start - 1)].set_index("player_id")
+    final = history.loc[history.season_start.eq(outcome_start)].set_index("player_id")
+    hits_table = test.loc[test.actual.eq(1)].set_index("player_id")
+    before, after = prior.reindex(hits_table.index), final.reindex(hits_table.index)
+    rows = pd.DataFrame({
+        "Rank": hits_table["rank"],
+        "Player": after.player_name.fillna(before.player_name),
+        "Minutes per game": [change(a, b) for a, b in zip(before.mpg, after.mpg)],
+        "Production percentile": [change(a, b) for a, b in zip(before.pra_pctl, after.pra_pctl)],
+        "Predicted chance": hits_table.prediction.map(breakout_chance_label),
+    })
+    comparison_columns = ("Minutes per game", "Production percentile")
+    number_columns = {"Rank", "Predicted chance", *comparison_columns}
+    if not rows.empty:
+        st.markdown(f"**Players who broke out in {outcome}**")
+        st.caption(
+            f"Stats compare {baseline} → {outcome}. Rank and chance come from the preseason test predictions."
+            + (f" Shaded rows mark top-{len(top)} picks." if hits else "")
+        )
+        html_table(rows, numeric=number_columns, stacked=comparison_columns,
+                   highlight=rows["Rank"].le(len(top)).tolist())
     with st.expander("How accurate is Breakout Watch?"):
-        season = str(test.season.iloc[0])
-        outcome = f"{int(season[:4]) + 1}-{str(int(season[:4]) + 2)[-2:]}"
         st.write(f"We tested the model on {len(test):,} players heading into the {outcome} season. "
                  "It never saw that season while it was being built.")
         st.markdown(
@@ -1798,32 +1852,172 @@ def breakout_accuracy(version):
         evaluation_downloads("breakout")
 
 
+def breakout_chance_label(probability):
+    if probability < .001:
+        return "<0.1%"
+    return f"{probability:.1%}" if probability < .1 else f"{probability:.0%}"
+
+
+def breakout_progress(history, selected, upcoming, forecast_start, version):
+    season_players = history.loc[history.season_start.eq(forecast_start)]
+    latest_completed = json.loads((APP / "manifest.json").read_text())["latest_completed_start"]
+    games = table("player_games", version)
+    through = games.loc[games.season_start.eq(forecast_start) & games.played, "date"].max()
+    provisional = False
+    if forecast_start > latest_completed and not season_players.empty:
+        team_games = table("team_games", version)
+        counts = team_games.loc[team_games.season.eq(upcoming)].groupby("team_id").game_id.nunique()
+        provisional = counts.reindex(table("teams", version).team_id, fill_value=0).lt(20).any()
+    min_games = 5 if provisional else 20
+    hist = history.loc[history.player_id.eq(selected.player_id) & history.season_start.le(forecast_start)].copy()
+    if provisional:
+        eligible = season_players.games.ge(min_games) & season_players.mpg.ge(15)
+        ranks = season_players.pra_per36.where(eligible).rank(method="average", pct=True) * 100
+        hist.loc[hist.season_start.eq(forecast_start), "pra_pctl"] = ranks.reindex(hist.index)
+    current_rows = hist.loc[hist.season_start.eq(forecast_start)]
+    current = current_rows.iloc[0] if not current_rows.empty else None
+    targets = {
+        "mpg": max(20, selected.mpg + 5),
+        "pra_pctl": selected.pra_pctl + 15,
+    }
+    metrics = {"mpg": "Minutes per game", "pra_pctl": "Production percentile", "pra_per36": "Production per 36"}
+    colors = {"mpg": "#317aca", "pra_pctl": "#bd652e", "pra_per36": "#168458"}
+    cards = []
+    for metric, target in targets.items():
+        value = current[metric] if current is not None else float("nan")
+        current_label = f"{value:.1f}" if pd.notna(value) else '<span aria-label="Unavailable">—</span>'
+        if pd.notna(value):
+            current_rounded, previous_rounded = round(value, 1), round(selected[metric], 1)
+            direction, symbol = ("up", "↑") if current_rounded > previous_rounded else (
+                ("down", "↓") if current_rounded < previous_rounded else ("flat", "→")
+            )
+            description = {"up": "Higher", "down": "Lower", "flat": "Unchanged"}[direction]
+            current_label += (
+                f' <span class="breakout-direction {direction}" role="img"'
+                f' aria-label="{description} compared with last season" title="{description} compared with last season">{symbol}</span>'
+            )
+        current_context = (
+            ' · provisional<sup>*</sup>'
+            if metric == "pra_pctl" and provisional and pd.notna(value) else ""
+        )
+        context = ""
+        if metric == "pra_pctl" and pd.isna(value):
+            if current is None:
+                reason = "no games recorded this season"
+            else:
+                unmet = []
+                if current.games < min_games:
+                    unmet.append(f"{int(current.games)} games played ({min_games} required)")
+                if pd.notna(current.mpg) and current.mpg < 15:
+                    unmet.append(f"{current.mpg:.1f} MPG (15 MPG required)")
+                reason = " and ".join(unmet) or "season stats are incomplete"
+            context = f"<small>No production rank yet: {reason}.</small>"
+        cards.append(
+            f'<article class="ciq-card" style="--accent:{colors[metric]}"><h4>{metrics[metric]}</h4>'
+            '<dl class="breakout-comparison">'
+            f'<div><dt>Last season</dt><dd>{selected[metric]:.1f}</dd></div>'
+            f'<div class="breakout-current"><dt>This season{current_context}</dt><dd>{current_label}</dd></div>'
+            f'<div><dt>Target</dt><dd>{target:.1f}</dd></div>'
+            f'</dl>{context}</article>'
+        )
+    st.html(f"""
+        <style>
+        .breakout-comparison {{margin:0 0 .3rem;}}
+        .breakout-comparison > div {{display:flex;flex-wrap:wrap;justify-content:space-between;
+            align-items:baseline;gap:.15rem .6rem;padding:.26rem .45rem;}}
+        .breakout-comparison dd {{margin:0;font-weight:650;font-variant-numeric:tabular-nums;}}
+        .breakout-current {{background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:.35rem;}}
+        </style>
+        <div class="ciq-cards">{"".join(cards)}</div>
+    """)
+    raw = f"{current.pra_per36:.1f}" if current is not None and pd.notna(current.pra_per36) else "Unavailable"
+    st.caption(f"**Production per 36 min this season:** {raw} · Points + rebounds + assists")
+    in_progress = hist.season_start.eq(forecast_start) & (forecast_start > latest_completed)
+    for column, (metric, label) in zip(st.columns(3), metrics.items()):
+        with column:
+            completed = hist.assign(**{metric: hist[metric].mask(in_progress)})
+            line = px.line(completed, x="season", y=metric, markers=True,
+                           color_discrete_sequence=[colors[metric]])
+            hover = f"%{{x}}<br>{label}: %{{y:.1f}}<extra></extra>"
+            line.update_traces(connectgaps=False, hovertemplate=hover)
+            if in_progress.any() and pd.notna(current[metric]):
+                previous = hist.loc[hist.season_start.eq(forecast_start - 1) & hist[metric].notna()]
+                if not previous.empty:
+                    line.add_scatter(
+                        x=[previous.iloc[0].season, current.season],
+                        y=[previous.iloc[0][metric], current[metric]], mode="lines",
+                        line=dict(color=colors[metric], dash="dot"), hoverinfo="skip", showlegend=False,
+                    )
+                line.add_scatter(
+                    x=[current.season], y=[current[metric]], mode="markers",
+                    marker=dict(color=colors[metric], symbol="circle-open"), hovertemplate=hover, showlegend=False,
+                )
+            if metric in targets:
+                line.add_hline(y=targets[metric], line_dash="dash", line_color=colors[metric],
+                               annotation_text=f"Target {targets[metric]:.1f}", annotation_position="top left")
+            if metric == "pra_pctl":
+                line.update_yaxes(range=[0, 100])
+            line.update_yaxes(title=None, nticks=5)
+            line.update_xaxes(type="category", title=None, nticks=4, tickangle=0)
+            line.update_layout(title=dict(text=label, font=dict(size=14), x=.02),
+                               height=185, margin=dict(l=34, r=14, t=32, b=28))
+            show_chart(line, config={"displayModeBar": False})
+    if provisional:
+        st.html(
+            '<small style="display:block">'
+            f'<b>* Early-season rankings.</b> {ranks.count()} players qualify with {min_games}+ games and 15+ minutes per game. '
+            'Percentiles can shift as more players qualify. The tracker returns to the standard 20-game minimum '
+            'once every team has 20 recorded games. Last season’s baseline and the official target use the standard cutoff.</small>'
+        )
+    if pd.notna(through):
+        st.caption(
+            f"The current-season progress metrics use {upcoming} NBA box scores "
+            f"from games played through {through:%b} {through.day}, {through.year}."
+        )
+
+
 def breakout_page(seasons, version):
     st.header("Breakout Watch")
+    up, down = forecast_result_colors()
+    st.html(f"""<style>
+    .breakout-score strong,.breakout-chance strong {{display:block;font-size:clamp(1.65rem,4vw,2.3rem);line-height:1.2;}}
+    .breakout-score > span {{font-size:.9rem;}}
+    .ciq-cell-detail {{margin-inline-start:.45rem;font-size:.78rem;opacity:.8;}}
+    .breakout-direction {{margin-inline-start:.25rem;font-weight:700;}}
+    .breakout-direction.up {{color:{up};}}
+    .breakout-direction.down {{color:{down};}}
+    </style>""")
     path = APP / "breakout_candidates.csv.gz"
     if not path.exists():
         st.info("Breakout model not prepared. Run the offline training command.")
         return
     f = table("breakout_candidates", version)
-    upcoming = f"{int(f.season_start.max()) + 1}-{str(int(f.season_start.max()) + 2)[-2:]}"
+    if f.empty:
+        st.info("No breakout candidates are available.")
+        return
+    forecast_start = int(f.season_start.max()) + 1
+    upcoming = f"{forecast_start}-{(forecast_start + 1) % 100:02d}"
+    history = breakout_history(seasons)
     page_intro(f"See which players the model thinks are most likely to take a big leap in {upcoming}.",
                ["Scan the top 10", "Pick a player to see his track record", "Check how past picks did"])
     st.html(
         '<div class="ciq-card" style="--accent:#a8441a"><b>What counts as a breakout?</b>'
         '<div class="ciq-stat-row" style="margin-top:.5rem">'
-        '<div class="ciq-stat"><b>MINUTES</b><strong>20+</strong><span>per game next season</span></div>'
-        '<div class="ciq-stat"><b>MORE PLAYING TIME</b><strong>+5</strong><span>minutes per game or more</span></div>'
-        '<div class="ciq-stat"><b>PRODUCTION</b><strong>+15</strong><span>percentile points in points + rebounds + assists per 36 min</span></div>'
-        '</div></div>')
+        '<div class="ciq-stat"><b>PLAYING TIME</b><strong>20+ MPG</strong><span>Season average</span></div>'
+        '<div class="ciq-stat"><b>PLAYING TIME GAIN</b><strong>+5 MPG</strong><span>Vs. last season</span></div>'
+        '<div class="ciq-stat"><b>PRODUCTION RANK GAIN</b><strong>+15</strong><span>Percentile points</span></div>'
+        '</div><small style="display:block;margin-top:.5rem">All three are required. '
+        'Production ranks points + rebounds + assists per 36 min among eligible NBA players.</small></div>')
     st.caption(f"Estimates use stats through the {f.season.iloc[0]} season. Rookies are excluded. "
                "Chances are model estimates, not guarantees.")
     st.subheader("Top 10 breakout chances")
-    leaders = f.nlargest(10, "probability").sort_values("probability")
-    chart = px.bar(leaders, x="probability", y="player_name", orientation="h", text="probability",
+    leaders = f.nlargest(10, "probability").sort_values("probability").copy()
+    leaders["chance"] = leaders.probability.map(breakout_chance_label)
+    chart = px.bar(leaders, x="probability", y="player_name", orientation="h", text="chance",
                    labels={"probability": "Estimated breakout chance", "player_name": "Player"},
                    color_discrete_sequence=["#a8441a"])
-    chart.update_traces(texttemplate="%{x:.0%}", textposition="outside", cliponaxis=False,
-                        hovertemplate="%{y}: %{x:.0%}<extra></extra>")
+    chart.update_traces(textposition="outside", cliponaxis=False,
+                        hovertemplate="%{y}: %{text}<extra></extra>")
     chart.update_xaxes(tickformat=".0%", range=[0, min(1, leaders.probability.max() * 1.18)])
     chart.update_yaxes(title_text=None, automargin=True)
     chart.update_layout(height=400, margin=dict(l=10, r=40, t=40, b=40), bargap=.35)
@@ -1833,21 +2027,10 @@ def breakout_page(seasons, version):
     if pid is not None:
         selected = f[f.player_id.eq(pid)].iloc[0]
         rank = int(f.probability.rank(ascending=False, method="min")[f.player_id.eq(pid)].iloc[0])
-        hist = scouting.canonical(seasons)
-        hist = hist[hist.player_id.eq(pid)].sort_values("season_start")
         st.html(
             f'<div class="ciq-card" style="--accent:#a8441a"><small>Rank #{rank} of {len(f)}</small>'
-            f'<h4>{escape(selected.player_name)}</h4><div class="ciq-stat-row">'
-            f'<div class="ciq-stat"><b>BREAKOUT CHANCE</b><strong>{selected.probability:.0%}</strong></div>'
-            f'<div class="ciq-stat"><b>MINUTES / GAME</b><strong>{selected.mpg:.1f}</strong><span>{selected.season}</span></div>'
-            f'<div class="ciq-stat"><b>PTS+REB+AST / 36</b><strong>{selected.pra_per36:.1f}</strong><span>{selected.season}</span></div>'
-            '</div></div>')
-        trend = hist.rename(columns={"mpg": "Minutes per game", "pra_per36": "Points + rebounds + assists per 36"})
-        line = px.line(trend, x="season", y=["Minutes per game", "Points + rebounds + assists per 36"], markers=True,
-                       labels={"variable": "Measure", "value": "Season average", "season": "Season"},
-                       color_discrete_sequence=["#1f5bab", "#a8441a"])
-        line.for_each_trace(lambda trace: trace.update(line_dash="dash") if trace.name.startswith("Points") else None)
-        line.update_layout(height=320, legend=dict(orientation="h", y=1.15), margin=dict(l=40, r=15, t=30, b=40))
-        show_chart(line)
-        st.caption("Season averages for every season in the data. The current season isn't part of the estimate.")
-    breakout_accuracy(version)
+            f'<h4>{escape(selected.player_name)}</h4><div class="breakout-chance">'
+            f'<strong>{escape(breakout_chance_label(selected.probability))}</strong>'
+            f'<span>Preseason chance of meeting all three breakout criteria by the end of {upcoming}.</span></div></div>')
+        breakout_progress(history, selected, upcoming, forecast_start, version)
+    breakout_accuracy(version, history)
