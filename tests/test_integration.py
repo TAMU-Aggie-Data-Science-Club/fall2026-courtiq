@@ -240,12 +240,12 @@ class RealTests(unittest.TestCase):
         self.assertEqual([chart["layout"]["title"]["text"] for chart in charts], ["Points", "Rebounds", "Assists"])
         for chart in charts:
             bars, away_range, home_range, average = chart["data"][:4]
-            self.assertEqual(bars["orientation"], "h")
+            self.assertEqual(bars["orientation"], "v")
             self.assertEqual(average["marker"]["symbol"], "circle-open")
             for whisker in (away_range, home_range):
-                start, end, _, left_cap, _, _, right_cap, _ = whisker["x"]
-                self.assertEqual((start, end), (left_cap, right_cap))
-            self.assertEqual(chart["layout"]["xaxis"]["ticks"], "outside")
+                low, high, _, low_cap, _, _, high_cap, _ = whisker["y"]
+                self.assertEqual((low, high), (low_cap, high_cap))
+            self.assertEqual(chart["layout"]["yaxis"]["ticks"], "outside")
         self.assertTrue(any(item.value == "Past meetings" for item in at.subheader))
 
     def test_team_forecast_custom_spread_and_recent_window(self):

@@ -252,7 +252,7 @@ def ranks(version, season, lens, min_games, ratings_modified, _league):
     return scouting.rankings(_league, season, lens, min_games=min_games)
 
 
-def custom_matchup(lookup, key, latest, *, compact=False, earliest=None):
+def custom_matchup(lookup, key, latest, *, compact=False, earliest=None, latest_supported=None):
     if compact:
         c1, swap_picker, c2, date_picker = st.columns([1.25, .24, 1.25, 1], gap="small")
     else:
@@ -274,8 +274,12 @@ def custom_matchup(lookup, key, latest, *, compact=False, earliest=None):
     default = (latest + timedelta(days=1)).date()
     if earliest is not None:
         default = max(default, earliest)
-    when = date_picker.date_input("Game date", default, min_value=earliest, key=key+"_date")
-    if earliest is not None:
+    if latest_supported is not None:
+        default = min(default, latest_supported)
+    when = date_picker.date_input(
+        "Game date", default, min_value=earliest, max_value=latest_supported, key=key+"_date",
+    )
+    if earliest is not None and latest_supported is None:
         date_picker.caption(f"Earliest forecast date: {earliest:%b} {earliest.day}, {earliest.year}.")
     return home, away, when
 
@@ -1180,7 +1184,12 @@ def forecast_matchup(names, version, latest, key="team", model_name="team"):
             return None
         earliest = cutoff.date() + timedelta(days=1)
         if mode == "Custom Matchup":
-            return custom_matchup(names, key, latest, compact=True, earliest=earliest)
+            latest_supported = None
+            if model_name == "player":
+                season_start = latest.year if latest.month >= 7 else latest.year - 1
+                latest_supported = datetime(season_start + 1, 6, 30).date()
+            return custom_matchup(names, key, latest, compact=True, earliest=earliest,
+                                  latest_supported=latest_supported)
 
     today = pd.Timestamp(datetime.now(ZoneInfo("America/Chicago")).date())
     is_upcoming = mode == "Upcoming Games"
@@ -1231,8 +1240,7 @@ def forecast_matchup(names, version, latest, key="team", model_name="team"):
             gid: f"{row.date:%b} {row.date.day} · {names[row.away_team_id]} at {names[row.home_team_id]}"
             for gid, row in slate.iterrows()
         }
-        game_id = game_picker.selectbox("Upcoming matchup", list(labels), format_func=labels.get, key=f"{key}_upcoming_game")
-        st.caption(f"Showing {len(days)} game {'date' if len(days) == 1 else 'dates'} in the schedule snapshot.")
+        game_label, game_key = "Upcoming matchup", f"{key}_upcoming_game"
     else:
         opponent = 0
         if team_id:
@@ -1273,7 +1281,14 @@ def forecast_matchup(names, version, latest, key="team", model_name="team"):
         day = day_picker.selectbox("Game day", list(days), format_func=days.get, key=f"{key}_past_date")
         slate = month_games.loc[month_games.date.eq(pd.Timestamp(day))].set_index("game_id")
         labels = {gid: f"{names[row.away_team_id]} at {names[row.home_team_id]}" for gid, row in slate.iterrows()}
-        game_id = game_picker.selectbox("Matchup", list(labels), format_func=labels.get, key=f"{key}_past_game")
+        game_label, game_key = "Matchup", f"{key}_past_game"
+    previous_game = st.session_state.get(game_key)
+    if previous_game not in labels:
+        # A date or filter change can leave the widget pointing at a game outside this slate.
+        st.session_state[game_key] = next(iter(labels))
+    game_id = game_picker.selectbox(game_label, list(labels), format_func=labels.get, key=game_key)
+    if is_upcoming:
+        st.caption(f"Showing {len(days)} game {'date' if len(days) == 1 else 'dates'} in the schedule snapshot.")
     selected = slate.loc[game_id]
     return selected.home_team_id, selected.away_team_id, selected.date.date()
 
@@ -1584,89 +1599,124 @@ def player_accuracy(version):
 STAT_ABBR = {"points": "PTS", "rebounds": "REB", "assists": "AST"}
 
 
-def player_card(name, team, side, color, frame, actual=None):
+def player_average_label(count):
+    if count == 0:
+        return "Training average"
+    return "Last-10 average" if count >= 10 else f"{count}-game average"
+
+
+def player_card(name, team, side, color, frame, recent_counts, actual=None):
     stats = []
-    for row in frame.itertuples():
+    projections = {} if frame is None else {row.stat: row for row in frame.itertuples()}
+    for stat, label in STAT_ABBR.items():
+        row = projections.get(stat)
         actual_label = ""
         if actual is not None:
-            value = actual[row.stat]
+            value = actual[stat]
             actual_label = f'<span class="player-actual">Actual {value:.0f}</span>' if pd.notna(value) else '<span>Actual —</span>'
+        projection = ""
+        if row is not None:
+            average = player_average_label(recent_counts[stat])
+            projection = (f'<strong>{row.prediction:.1f}</strong><span>Range {row.low:.0f}–{row.high:.0f}</span>'
+                          f'<span>{average} {row.baseline:.1f}</span>')
         stats.append(
-            f'<div class="ciq-stat"><b>{STAT_ABBR.get(row.stat, escape(row.stat.upper()))}</b><strong>{row.prediction:.1f}</strong>'
-            f'<span>Range {row.low:.0f}–{row.high:.0f}</span><span>Last-10 avg {row.baseline:.1f}</span>{actual_label}</div>')
-    appearance = ""
-    if actual is not None and not actual["played"]:
-        appearance = '<small class="player-appearance">No appearance recorded</small>'
-    return (f'<article class="ciq-card" style="--accent:{color}"><small>{side} · {escape(team)}</small>'
+            f'<div class="ciq-stat"><b>{label}</b>{projection}{actual_label}</div>')
+    badge = ""
+    if frame is None:
+        badge = ('<span class="player-projection-warning"><span aria-hidden="true">⚠</span> '
+                 'Projection unavailable</span>')
+    tiles = f'<div class="ciq-stat-row">{"".join(stats)}</div>' if frame is not None or actual is not None else ""
+    return (f'<article class="ciq-card" style="--accent:{color}">'
+            f'<div class="player-card-team"><small>{side} · {escape(team)}</small>{badge}</div>'
             f'<h4>{escape(name)}</h4>'
-            f'<div class="ciq-stat-row">{"".join(stats)}</div>{appearance}</article>')
+            f'{tiles}</article>')
 
 
-def player_projection_charts(sides, recent_baselines, actual=None):
+def player_projection_charts(sides, recent_counts, actual=None):
     import plotly.graph_objects as go
 
     ink = DARK_CHART["text"] if dark() else "#334651"
     grid = DARK_CHART["grid"] if dark() else "#e0e4e7"
     labels = [name for name, _, _ in sides]
-    by_stat = [frame.set_index("stat") for _, _, frame in sides]
-    average = "**last-10 average**"
-    if recent_baselines.isna().any().any():
-        average += " (or the training average if unavailable)"
-    st.caption(
-        f"Bars show the **projection**, circles mark the {average}, "
-        "and capped lines show the **likely range (80%)**."
-        + (" Green diamonds mark **actual results**." if actual is not None and actual[list(STAT_ABBR)].notna().any().any() else "")
-    )
-    for stat in STAT_ABBR:
+    by_stat = [
+        frame.set_index("stat") if frame is not None else
+        pd.DataFrame(index=list(STAT_ABBR), columns=["prediction", "baseline", "low", "high"], dtype=float)
+        for _, _, frame in sides
+    ]
+    captions = []
+    if any(frame is not None for _, _, frame in sides):
+        captions.append("Bars show the **projection**, circles mark the **comparison average**, "
+                        "and capped lines show the **likely range (80%)**.")
+    if actual is not None and actual.notna().any().any():
+        captions.append("Green diamonds mark **actual results**.")
+    if captions:
+        st.caption(" ".join(captions))
+    for column, stat in zip(st.columns(3), STAT_ABBR):
         values = [frame.loc[stat] for frame in by_stat]
-        baseline_labels = ["Last-10 average" if pd.notna(value) else "Training average"
-                           for value in recent_baselines[stat]]
+        baseline_labels = recent_counts[stat].map(player_average_label)
         figure = go.Figure(go.Bar(
-            x=[row.prediction for row in values], y=[1, 0], orientation="h", width=.48,
+            x=[0, 1], y=[row.prediction for row in values], orientation="v", width=.55,
             marker_color=[color for _, color, _ in sides], opacity=.65,
             customdata=[[label, row.baseline, row.low, row.high, baseline_label]
                         for label, row, baseline_label in zip(labels, values, baseline_labels)],
-            hovertemplate="<b>%{customdata[0]}</b><br>Projection: %{x:.1f}<br>"
+            hovertemplate="<b>%{customdata[0]}</b><br>Projection: %{y:.1f}<br>"
                           "%{customdata[4]}: %{customdata[1]:.1f}<br>"
                           "80% range: %{customdata[2]:.1f}–%{customdata[3]:.1f}<extra></extra>",
         ))
-        for y, row in zip((1, 0), values):
+        for x, row in enumerate(values):
+            if pd.isna(row.prediction):
+                continue
             figure.add_trace(go.Scatter(
-                x=[row.low, row.high, None, row.low, row.low, None, row.high, row.high],
-                y=[y, y, None, y - .10, y + .10, None, y - .10, y + .10],
+                x=[x, x, None, x - .09, x + .09, None, x - .09, x + .09],
+                y=[row.low, row.high, None, row.low, row.low, None, row.high, row.high],
                 mode="lines", line=dict(color=ink, width=2), hoverinfo="skip",
             ))
         figure.add_trace(go.Scatter(
-            x=[row.baseline for row in values], y=[1, 0], mode="markers",
+            x=[-.18, .82], y=[row.baseline for row in values], mode="markers",
             marker=dict(symbol="circle-open", size=12, color=ink, line=dict(width=2)),
             customdata=list(zip(labels, baseline_labels)),
-            hovertemplate="<b>%{customdata[0]}</b><br>%{customdata[1]}: %{x:.1f}<extra></extra>",
+            hovertemplate="<b>%{customdata[0]}</b><br>%{customdata[1]}: %{y:.1f}<extra></extra>",
         ))
-        maximum = max(1, *(max(row.prediction, row.baseline, row.high) for row in values))
+        maximum = max([1, *(max(row.prediction, row.baseline, row.high) for row in values if pd.notna(row.prediction))])
         if actual is not None:
-            actual_points = [(value, y, label) for value, y, label in zip(actual[stat], (1, 0), labels) if pd.notna(value)]
+            actual_points = [(value, x, label) for value, x, label in zip(actual[stat], (0, 1), labels) if pd.notna(value)]
             if actual_points:
                 scores, levels, names = zip(*actual_points)
                 maximum = max(maximum, *scores)
+                comparisons = []
+                for score, x in zip(scores, levels):
+                    prediction = values[x].prediction
+                    comparison = ""
+                    if pd.notna(prediction):
+                        difference = round(score - prediction, 1)
+                        if difference == 0:
+                            outcome = "Matched projection"
+                        else:
+                            direction = "above" if difference > 0 else "below"
+                            outcome = f"{abs(difference):.1f} {direction} projection"
+                        comparison = f"<br>Projected: {prediction:.1f}<br>{outcome}"
+                    comparisons.append(comparison)
                 figure.add_trace(go.Scatter(
-                    x=scores, y=[y + .26 for y in levels], mode="markers", name="Actual",
+                    x=[x + .18 for x in levels], y=scores, mode="markers", name="Actual",
                     marker=dict(symbol="diamond", size=11, color=forecast_result_colors()[0]), cliponaxis=False,
-                    text=names, hovertemplate="<b>%{text}</b><br>Actual: %{x:.0f}<extra></extra>",
+                    text=names, customdata=comparisons,
+                    hovertemplate="<b>%{text}</b><br>Actual: %{y:.0f}%{customdata}<extra></extra>",
                 ))
         figure.update_layout(
-            title=dict(text=stat.title(), x=.02, font=dict(size=15)), height=178,
-            margin=dict(l=15, r=20, t=32, b=28), showlegend=False,
+            title=dict(text=stat.title(), x=.5, font=dict(size=15)), height=320,
+            margin=dict(l=31, r=12, t=35, b=45), showlegend=False,
         )
-        figure.update_xaxes(range=[0, maximum * 1.08], nticks=7, showgrid=True, gridcolor=grid,
+        figure.update_xaxes(tickvals=[0, 1], ticktext=labels, range=[-.55, 1.55],
+                            showgrid=False, automargin=True, fixedrange=True)
+        figure.update_yaxes(range=[0, maximum * 1.08], nticks=6, showgrid=True, gridcolor=grid,
                             ticks="outside", tickformat="~g", fixedrange=True)
-        figure.update_yaxes(tickvals=[1, 0], ticktext=labels, range=[-.55, 1.55], showgrid=False,
-                            automargin=True, fixedrange=True)
-        show_chart(figure, theme=None, config={"displayModeBar": False})
+        with column:
+            show_chart(figure, theme=None, config={"displayModeBar": False})
 
 
 def player_page(p, t, teams, version):
     st.html(TEAM_FORECAST_STYLE)
-    edge_color = "#7fdfbe" if dark() else "#12694f"
+    edge_color, warning_color = forecast_result_colors()
     st.html(f"""<style>
     .ciq-table strong.player-stat-edge {{
         display:inline-block; white-space:nowrap; padding:.06rem .32rem; border-radius:.3rem;
@@ -1675,75 +1725,146 @@ def player_page(p, t, teams, version):
         border:1px solid color-mix(in srgb,{edge_color} 42%,transparent);
     }}
     .ciq-stat .player-actual {{color:{edge_color};font-weight:700;margin-top:.3rem;}}
-    .player-appearance {{display:block;margin-top:.25rem;}}
+    .player-card-team {{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .5rem;}}
+    .player-projection-warning {{display:inline-block;padding:.1rem .45rem;border-radius:999px;
+        font-size:.78rem;font-weight:650;color:{warning_color};
+        background:color-mix(in srgb,{warning_color} 14%,transparent);
+        border:1px solid color-mix(in srgb,{warning_color} 48%,transparent);}}
     </style>""")
     st.header("Player Matchups")
     page_intro("Pick a game, then one player from each team, to compare their projected points, rebounds and assists.",
                ["Find a game", "Pick a player on each team", "Compare projections and past meetings"])
     names = teams.set_index("team_id").team_name.to_dict()
     codes = teams.set_index("team_id").team_code.to_dict()
-    choice = forecast_matchup(names, version, p.date.max(), key="player", model_name="player")
+    choice = forecast_matchup(names, version, p.loc[p.played, "date"].max(), key="player", model_name="player")
     if choice is None:
         return
     home, away, when = choice
-    st.caption(f"Projections use box scores before game day, available through {p.date.max():%b %d, %Y}.")
     prior = p[p.date.lt(pd.Timestamp(when)) & p.played]
     ordered = prior.sort_values(["date", "game_id"])
-    roster = ordered.drop_duplicates("player_id", keep="last").copy()
+    season_start = when.year if when.month >= 7 else when.year - 1
+    game = team_actual_result(version, home, away, when)
+    is_custom = st.session_state.get("player_matchup_mode") == "Custom Matchup"
+    offseason = False
+    fallback_teams = []
+    date_hint = ""
+    notes = []
+    if game is not None:
+        roster = p.loc[p.game_id.eq(game.game_id) & p.played & p.team_id.isin([home, away])].copy()
+        source = "Player lists show recorded appearances for this game."
+    else:
+        roster = ordered.drop_duplicates("player_id", keep="last")
+        roster = roster.loc[roster.team_id.isin([home, away])].copy()
+        roster = roster.loc[roster.season_start.eq(roster.groupby("team_id").season_start.transform("max"))]
+        fallback_teams = roster.loc[roster.season_start.lt(season_start), "team_id"].unique()
+        source = "Player lists use each player’s last recorded team. Trades, injuries, and lineup changes can affect who plays."
+        if len(fallback_teams):
+            fallback_names = ", ".join(names[team_id] for team_id in fallback_teams)
+            source = f"Player lists use last-known teams, with prior-season data for {fallback_names}. Rosters and availability may differ."
+        if is_custom:
+            dates = t.loc[t.season_start.eq(season_start), "date"]
+            completed = json.loads((APP / "manifest.json").read_text())["latest_completed_start"]
+            day = pd.Timestamp(when)
+            offseason = (
+                when.month in (7, 8, 9)
+                or (not dates.empty and day < dates.min())
+                or (season_start <= completed and not dates.empty and day > dates.max())
+            )
+            date_hint = "Try a regular-season date after both players have a recorded game."
+            tasks = bundle("player", version)["tasks"]
+            cutoff = max(pd.Timestamp(task["inference_available_after"]) for task in tasks.values())
+            ranges = t.loc[t.date.gt(cutoff)].groupby("season_start").date.agg(["min", "max"])
+            if not ranges.empty:
+                distances = (ranges["min"] - day).clip(lower=pd.Timedelta(0)) + (
+                    day - ranges["max"]
+                ).clip(lower=pd.Timedelta(0))
+                start, end = ranges.loc[distances.idxmin(), ["min", "max"]]
+                date_hint = (
+                    "Try regular-season dates after both players’ first recorded games "
+                    f"({start:%b} {start.day}, {start.year}–{end:%b} {end.day}, {end.year})."
+                )
+            if offseason:
+                date_hint = "Projections are unavailable on offseason dates. " + date_hint
     recent = ordered.groupby("player_id").tail(10)
     roster["recent_minutes"] = roster.player_id.map(recent.groupby("player_id").minutes.mean())
-    roster = roster[roster.season_start.eq(roster.season_start.max())]
     away_col, home_col = st.columns(2)
     with away_col:
         b = choose(roster[roster.team_id.eq(away)], "p_b", f"Away player · {names[away]}")
     with home_col:
         a = choose(roster[roster.team_id.eq(home)], "p_a", f"Home player · {names[home]}")
-    st.caption("Players are listed by recent minutes with their last recorded team. "
-               "Injuries, availability and who guards whom aren't in the box scores.")
+    status = st.empty()
+    latest = p.date.max()
     if a is None or b is None:
-        st.info("No supported historical roster for this date.")
+        notes.append("The data doesn’t provide a player list for both teams.")
+        if date_hint:
+            notes.append(date_hint)
+        status.warning("**Matchup status.** " + source + "\n\n" +
+                       "\n\n".join(notes))
         return
     player_names = roster.set_index("player_id").player_name
     home_color, away_color = pair_colors(teams, home, away)
 
-    left = right = None
-    progress = st.progress(0, text="Loading the projection model…")
-    try:
-        modified = (APP.parent / "artifacts" / "player.pkl").stat().st_mtime_ns
-        model("player", version, modified)
-        progress.progress(35, text=f"Projecting {player_names[a]}…")
-        left = cached_player_forecast(version, modified, a, away, when, True)
-        progress.progress(70, text=f"Projecting {player_names[b]}…")
-        right = cached_player_forecast(version, modified, b, home, when, False)
-        progress.progress(100, text="Projections ready")
-    except (ValueError, FileNotFoundError) as exc:
-        st.warning(str(exc))
-    finally:
-        progress.empty()
+    same_season = ordered.loc[ordered.season_start.eq(season_start) & ordered.player_id.isin([b, a])]
+    eligible = set(same_season.player_id)
+    if not offseason:
+        missing = [player_names[pid] for pid in (b, a) if pid not in eligible]
+        if missing:
+            notes.append(f"No projection for {', '.join(missing)}. A projection requires an earlier recorded game that season.")
+    recent_counts = (same_season.groupby("player_id").tail(10)
+                     .groupby("player_id")[list(STAT_ABBR)].count().reindex([b, a], fill_value=0))
+    forecasts = {}
+    if eligible and not offseason:
+        progress = st.progress(0, text="Loading the projection model…")
+        try:
+            modified = (APP.parent / "artifacts" / "player.pkl").stat().st_mtime_ns
+            for position, (pid, opponent, is_home) in enumerate(((b, home, False), (a, away, True)), start=1):
+                if pid in eligible:
+                    progress.progress(35 * position, text=f"Projecting {player_names[pid]}…")
+                    try:
+                        forecasts[pid] = cached_player_forecast(version, modified, pid, opponent, when, is_home)
+                    except (ValueError, FileNotFoundError) as exc:
+                        notes.append(f"No projection for {player_names[pid]}. {exc}")
+        except FileNotFoundError as exc:
+            notes.append("Player projections are unavailable because the model file is missing.")
+        finally:
+            progress.empty()
 
-    if left is not None and right is not None:
-        st.subheader("Projected stat line")
-        game = team_actual_result(version, home, away, when)
-        actual = None
-        if game is not None:
-            selected_teams = {b: away, a: home}
-            game_rows = p.loc[p.game_id.eq(game.game_id) & p.played & p.player_id.isin(selected_teams)]
-            game_rows = game_rows.loc[game_rows.team_id.eq(game_rows.player_id.map(selected_teams))]
-            actual = game_rows.set_index("player_id")[["played", *STAT_ABBR]].reindex([b, a])
-            actual["played"] = actual["played"].eq(True)
-        away_actual, home_actual = (actual.loc[b], actual.loc[a]) if actual is not None else (None, None)
-        st.html('<div class="ciq-cards">'
-                + player_card(player_names[b], names[away], "Away", away_color, right, away_actual)
-                + player_card(player_names[a], names[home], "Home", home_color, left, home_actual)
-                + "</div>")
-        season_start = when.year if when.month >= 7 else when.year - 1
-        same_season = ordered.loc[ordered.season_start.eq(season_start) & ordered.player_id.isin([b, a])]
-        recent_baselines = (same_season.groupby("player_id").tail(10)
-                            .groupby("player_id")[list(STAT_ABBR)].mean().reindex([b, a]))
+    if forecasts:
+        source += f" Projections use earlier box scores, with data available through {latest:%b %d, %Y}."
+    elif date_hint and (offseason or not eligible):
+        if not offseason:
+            first_games = p.loc[
+                p.played & p.season_start.eq(season_start) & p.player_id.isin([b, a])
+            ].groupby("player_id").date.min()
+            if len(first_games) == 2 and first_games.max() < latest:
+                first_supported_day = first_games.max() + timedelta(days=1)
+                date_hint = (
+                    f"Try {first_supported_day:%b} {first_supported_day.day}, {first_supported_day.year} "
+                    "or a later date in the same regular season, after both players have a recorded game."
+                )
+        notes.append(date_hint)
+    if notes or len(fallback_teams):
+        status.warning("\n\n".join(["**Matchup status.** " + source, *notes]))
+    else:
+        status.caption("**Matchup status.** " + source)
+    actual = roster.set_index("player_id")[list(STAT_ABBR)].loc[[b, a]] if game is not None else None
+    if actual is None and not forecasts:
+        st.subheader("Selected players")
+    elif forecasts:
+        st.subheader("Projected and actual stat lines" if actual is not None else "Projected stat line")
+    else:
+        st.subheader("Actual stat lines")
+    cards = [
+        player_card(player_names[pid], names[team_id], side, color, forecasts.get(pid), recent_counts.loc[pid],
+                    actual.loc[pid] if actual is not None else None)
+        for pid, team_id, side, color in ((b, away, "Away", away_color), (a, home, "Home", home_color))
+    ]
+    st.html(f'<div class="ciq-cards">{"".join(cards)}</div>')
+    if forecasts or (actual is not None and actual.notna().any().any()):
         player_projection_charts([
-            (player_names[b], away_color, right),
-            (player_names[a], home_color, left),
-        ], recent_baselines, actual)
+            (player_names[b], away_color, forecasts.get(b)),
+            (player_names[a], home_color, forecasts.get(a)),
+        ], recent_counts, actual)
 
     meetings = player_meetings(p, b, a, when)
     st.subheader("Past meetings")
@@ -1775,7 +1896,7 @@ def player_page(p, t, teams, version):
             f"""
 - **Projection** — The model's expected points, rebounds and assists, using each player's recent games, rest, home court and the opponent's defense and pace.
 - **Range** — Based on how far past projections missed. 8 in 10 past games landed inside it.
-- **Last-10 average** — The player's average over his previous 10 games this season. It's a simple yardstick to compare the projection with.
+- **Comparison average** — The player's average over up to 10 earlier games that season. The label shows how many games were used. A projection requires an earlier recorded appearance that season.
 - **Past meetings** — Games where both players appeared for opposing teams. Box scores don't show who guarded whom.
 - **Coverage** — Projections only use games before the selected date. [Historical NBA box scores]({SOURCE_NBA})
             """
