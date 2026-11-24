@@ -487,8 +487,8 @@ def scouting_advanced_stats(row):
 
 def scouting_sources():
     with st.expander("How to read the rankings"):
-        comparison, production, shooting, defense, advanced, badges = st.tabs(
-            ["Rankings", "Game stats", "Shooting", "Defense & rebounding", "Advanced stats", "Badges"]
+        comparison, production, shooting, defense, playmaking, advanced, badges = st.tabs(
+            ["Rankings", "Game stats", "Shooting", "Defense & rebounding", "Playmaking", "Advanced stats", "Badges"]
         )
         with comparison:
             st.markdown(
@@ -545,6 +545,15 @@ def scouting_sources():
             st.markdown(
                 "**Limits.** Ratings reflect teammates and lineups. Steals and blocks capture specific "
                 "plays, and the lens describes a statistical profile."
+            )
+        with playmaking:
+            st.markdown(
+                """
+- **Assists per game** — Total assists divided by games played. Shows how many baskets a player sets up per appearance.
+- **Assists per 36 minutes** — Total assists divided by minutes played, multiplied by 36. Compares assist production on the same playing-time scale.
+- **Assists per turnover** — Total assists divided by total turnovers. The ratio is unavailable when the player has zero turnovers.
+- **Points per game** — Total points divided by games played. Shows scoring volume alongside assist production.
+                """
             )
         with advanced:
             st.markdown(
