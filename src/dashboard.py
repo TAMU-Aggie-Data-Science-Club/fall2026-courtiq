@@ -9,6 +9,7 @@ import plotly.express as px
 import streamlit as st
 from src.pipeline import APP
 from src.features import scouting,impact
+from src.features.breakout import season_features
 
 SOURCE_NBA="https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores"
 SOURCE_ODDS="https://www.kaggle.com/datasets/cviaxmiwnptr/nba-betting-data-october-2007-to-june-2024"
@@ -90,6 +91,14 @@ DARK_STYLE = """
     outline:none;}
 .stApp [data-baseweb="select"] svg, .stApp [data-testid="stNumberInput"] button svg {fill:#ece6da; color:#ece6da;}
 .stApp [data-testid="stNumberInput"] button {background:#22313c; color:#ece6da; border-color:#3a4a56;}
+.stApp .st-key-team_spread :is([data-baseweb="input"], [data-baseweb="base-input"]):has(input:disabled),
+.stApp .st-key-team_spread input:disabled,
+.stApp .st-key-team_spread button:disabled {
+    background:#29333b !important; color:#b9c2c8 !important; border-color:#4a555e !important;
+    opacity:1;
+}
+.stApp .st-key-team_spread input:disabled {-webkit-text-fill-color:#b9c2c8 !important;}
+.stApp .st-key-team_spread button:disabled svg {fill:#8e9aa3; color:#8e9aa3;}
 [data-baseweb="popover"] > div, [data-baseweb="menu"], [data-baseweb="popover"] ul, [role="listbox"],
 [data-baseweb="calendar"], [data-baseweb="calendar"] > div, [data-testid="stPopoverBody"] {
     background:#1b2731 !important; color:#ece6da !important;}
@@ -135,6 +144,12 @@ DARK_STYLE = """
 .stApp [data-testid="stMain"] [data-testid="stBaseButton-pills"], .stApp [data-testid="stPopover"] button,
 .stApp [data-testid="stDownloadButton"] button {
     background:#1b2731 !important; color:#ece6da !important; border-color:#3a4a56 !important;}
+[data-testid="stPopoverBody"] [data-testid="stDownloadButton"] button {
+    background:#22313c !important; color:#ece6da !important; border-color:#52636f !important;}
+[data-testid="stPopoverBody"] [data-testid="stDownloadButton"] button :is(p, span, svg) {
+    color:inherit !important;}
+[data-testid="stPopoverBody"] [data-testid="stDownloadButton"] button:is(:hover,:focus-visible) {
+    background:#2a3b47 !important; border-color:#e08b4f !important;}
 .stApp [data-testid="stMain"] [data-testid="stBaseButton-segmented_controlActive"],
 .stApp [data-testid="stMain"] [data-testid="stBaseButton-pillsActive"] {
     background:color-mix(in srgb,#e08b4f 22%,#1b2731) !important; color:#ffd8bd !important; border-color:#e08b4f !important;}
@@ -198,7 +213,8 @@ def show_chart(fig, **kwargs):
     st.plotly_chart(fig, **kwargs)
 
 
-def html_table(frame, *, numeric=(), highlight=None, groups=None, gap_before=None, headers=None):
+def html_table(frame, *, numeric=(), highlight=None, groups=None, gap_before=None, headers=None, higher=None,
+               stacked=()):
     """Readable, theme-aware table. `highlight` marks rows (e.g. the selected player);
     `groups` is an optional list of (label, span) header groups; `gap_before` inserts a
     '…' row before that row position to show the list skips ahead."""
@@ -216,11 +232,18 @@ def html_table(frame, *, numeric=(), highlight=None, groups=None, gap_before=Non
         if gap_before is not None and position == gap_before:
             rows.append(f'<tr class="is-gap"><td colspan="{len(frame.columns)}">⋯</td></tr>')
         selected = highlight is not None and bool(highlight[position])
-        cells = "".join(
-            f'<td class="{"num" if col in numeric else ""}">{escape("—" if pd.isna(value) else str(value))}</td>'
-            for col, value in record.items())
+        cells = []
+        for col, value in record.items():
+            if col in stacked and isinstance(value, tuple):
+                primary, detail = value
+                label = f'<strong>{escape(primary)}</strong><small class="ciq-cell-detail">{escape(detail)}</small>'
+            else:
+                label = escape("—" if pd.isna(value) else str(value))
+            if higher is not None and col in higher and higher[col][position]:
+                label = f'<strong class="player-stat-edge">{label}</strong>'
+            cells.append(f'<td class="{"num" if col in numeric else ""}">{label}</td>')
         row_class = ' class="is-selected"' if selected else ""
-        rows.append(f"<tr{row_class}>{cells}</tr>")
+        rows.append(f'<tr{row_class}>{"".join(cells)}</tr>')
     st.html(f'<div class="ciq-table-wrap"><table class="ciq-table"><thead>{head}</thead>'
             f'<tbody>{"".join(rows)}</tbody></table></div>')
 
@@ -279,7 +302,7 @@ def ranks(version, season, lens, min_games, ratings_modified, _league):
     return scouting.rankings(_league, season, lens, min_games=min_games)
 
 
-def custom_matchup(lookup, key, latest, *, compact=False, earliest=None):
+def custom_matchup(lookup, key, latest, *, compact=False, earliest=None, latest_supported=None):
     if compact:
         c1, swap_picker, c2, date_picker = st.columns([1.25, .24, 1.25, 1], gap="small")
     else:
@@ -301,8 +324,12 @@ def custom_matchup(lookup, key, latest, *, compact=False, earliest=None):
     default = (latest + timedelta(days=1)).date()
     if earliest is not None:
         default = max(default, earliest)
-    when = date_picker.date_input("Game date", default, min_value=earliest, key=key+"_date")
-    if earliest is not None:
+    if latest_supported is not None:
+        default = min(default, latest_supported)
+    when = date_picker.date_input(
+        "Game date", default, min_value=earliest, max_value=latest_supported, key=key+"_date",
+    )
+    if earliest is not None and latest_supported is None:
         date_picker.caption(f"Earliest forecast date: {earliest:%b} {earliest.day}, {earliest.year}.")
     return home, away, when
 
@@ -1013,6 +1040,29 @@ TEAM_FORECAST_STYLE = """
 .forecast-side small {font-size:.85rem;}
 .forecast-score {display:block; font-size:clamp(1.7rem,5vw,2.7rem); line-height:1.15;}
 .forecast-chance {display:block; margin-top:.4rem;}
+.forecast-team-heading {display:flex;flex-wrap:wrap;align-items:center;gap:.2rem .45rem;}
+.forecast-favorite {display:inline-block;padding:.12rem .45rem;border-radius:999px;
+    border:1px solid color-mix(in srgb,var(--accent) 60%,transparent);
+    background:color-mix(in srgb,var(--accent) 15%,transparent);font-size:.78rem;font-weight:600;}
+.forecast-scoreboard .forecast-side {border-top-width:1px;border-inline-start:4px solid var(--accent);}
+.forecast-result {background:color-mix(in srgb,currentColor 5%,transparent);
+    border:1px solid #8794a455;border-radius:.65rem;padding:.65rem .85rem;}
+.forecast-result-scores {display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .65rem;font-size:.95rem;}
+.forecast-winner {font-weight:700;}
+.forecast-winner-label {margin-inline-start:.3rem;font-size:.78rem;color:var(--result-win);}
+.forecast-final-heading {display:flex;flex-wrap:wrap;align-items:center;gap:.35rem .65rem;margin-bottom:.35rem;}
+.forecast-final-heading h4 {margin:0;padding:0;}
+.forecast-verdict {border:1px solid #8794a466;border-radius:999px;padding:.15rem .5rem;font-size:.8rem;font-weight:600;}
+.forecast-verdict[data-result="correct"] {--badge-color:var(--result-win);}
+.forecast-verdict[data-result="missed"] {--badge-color:var(--result-miss);}
+.forecast-verdict[data-result] {color:var(--badge-color,currentColor);
+    background:color-mix(in srgb,var(--badge-color,currentColor) 12%,transparent);
+    border-color:color-mix(in srgb,var(--badge-color,currentColor) 55%,transparent);}
+.forecast-total {display:block;margin-top:.4rem;}
+.forecast-margin-key {display:flex;flex-wrap:wrap;gap:.45rem .65rem;margin:.2rem 0 .45rem;}
+.forecast-margin-key > span {display:inline-flex;align-items:center;gap:.45rem;
+    border:1px solid #8794a466;border-radius:.5rem;padding:.2rem .4rem;font-size:.82rem;}
+.forecast-margin-symbol {color:var(--cue);font-weight:700;min-width:1em;text-align:center;}
 .forecast-form-record {display:block; font-size:1.4rem;}
 .forecast-form-coverage {display:block; margin-top:.35rem;}
 .forecast-win-bar {display:flex; height:.65rem; margin:.7rem 0 0; border-radius:999px; overflow:hidden;
@@ -1059,9 +1109,14 @@ def forecast_scoreboard(result, home, away, colors):
     for side, name in (("away", away), ("home", home)):
         score = result[f"{side}_score"]
         probability = result[f"{side}_win"]
+        other_side = "home" if side == "away" else "away"
+        favorite = (
+            '<span class="forecast-favorite"><span aria-hidden="true">🎯</span> Predicted winner</span>'
+            if probability > result[f"{other_side}_win"] else ""
+        )
         cards.append(
             f'<article class="forecast-side" style="--accent:{colors[name]}">'
-            f'<small>{side.title()}</small><h4>{escape(name)}</h4>'
+            f'<small>{side.title()}</small><div class="forecast-team-heading"><h4>{escape(name)}</h4>{favorite}</div>'
             f'<strong class="forecast-score">{score:.1f}</strong><small>Projected points</small>'
             f'<b class="forecast-chance">{probability:.1%} win chance</b></article>'
         )
@@ -1070,20 +1125,24 @@ def forecast_scoreboard(result, home, away, colors):
         '<div class="forecast-win-bar" aria-hidden="true">'
         f'<span style="width:{result["away_win"]:.6%};background:{colors[away]}"></span>'
         f'<span style="width:{result["home_win"]:.6%};background:{colors[home]}"></span></div>'
+        f'<small class="forecast-total">Projected total · <b>{result["total"]:.1f} points</b></small>'
     )
 
 
-def forecast_margin_chart(result, home, away, colors):
+def forecast_margin_chart(result, home, away, colors, actual_margin=None, spread=None):
     import plotly.graph_objects as go
 
     margin = result["margin"]
     low = result["distribution"]["low"]
     high = result["distribution"]["high"]
-    extent = max(abs(low), abs(high), abs(margin), 4) * 1.15
+    market_margin = -spread if spread is not None else None
+    positions = [low, high, margin, actual_margin, market_margin]
+    extent = max(4, *(abs(value) for value in positions if value is not None)) * 1.15
+    neutral = DARK_CHART["text"] if dark() else "#526570"
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=[low, high], y=[0, 0], mode="lines+markers",
-        line=dict(color="#637783", width=5), marker=dict(size=8),
+        line=dict(color=neutral, width=4), marker=dict(size=8),
         text=[forecast_margin_label(value, home, away, 0) for value in (low, high)],
         hovertemplate="%{text}<extra>80% range endpoint</extra>",
     ))
@@ -1092,12 +1151,53 @@ def forecast_margin_chart(result, home, away, colors):
         marker=dict(symbol="diamond", size=13, color=colors[home if margin >= 0 else away]),
         hovertemplate=f"{forecast_margin_label(margin, home, away)}<extra>Projected margin</extra>",
     ))
+    rows = ["Forecast"]
+    if actual_margin is not None:
+        rows.append("Actual")
+        fig.add_trace(go.Scatter(
+            x=[actual_margin], y=[-1], mode="markers",
+            marker=dict(symbol="circle", size=15, color=forecast_result_colors()[0]),
+            name="Actual",
+            hovertemplate=f"{forecast_margin_label(actual_margin, home, away, 0)}<extra>Actual margin</extra>",
+        ))
+    if market_margin is not None:
+        near_marker = min(abs(market_margin - value) for value in (margin, low, high)) < extent * .07
+        fig.add_trace(go.Scatter(
+            x=[market_margin], y=[.25 if near_marker else 0], mode="markers",
+            marker=dict(symbol="square-open", size=12, color=neutral),
+            name="Spread", hovertemplate=f"{home} {spread:+g}<extra>Home spread</extra>",
+        ))
+    fig.update_yaxes(
+        tickvals=list(range(0, -len(rows), -1)), ticktext=rows,
+        range=[.45 - len(rows), .55], fixedrange=True, showgrid=False, zeroline=False,
+    )
     fig.add_vline(x=0, line_color="#697681", line_dash="dot")
     fig.update_xaxes(range=[-extent, extent], title_text="Away advantage  ←  Point margin  →  Home advantage",
                      tickformat=".0f")
-    fig.update_yaxes(visible=False, range=[-1, 1], fixedrange=True)
-    fig.update_layout(height=150, margin=dict(l=24, r=24, t=12, b=48), showlegend=False)
+    fig.update_layout(height=155 + 36 * (len(rows) - 1), margin=dict(l=68, r=16, t=12, b=48), showlegend=False)
     return fig
+
+
+def forecast_margin_key(result, home, away, projection_color, actual_margin, spread):
+    margin = result["margin"]
+    dist = result["distribution"]
+    low, high = (forecast_margin_label(dist[edge], home, away, 0) for edge in ("low", "high"))
+    neutral = DARK_CHART["text"] if dark() else "#526570"
+    entries = [
+        ("◆", "Projected", forecast_margin_label(margin, home, away), projection_color),
+        ("━", "80% range", f"{low} to {high}", neutral),
+    ]
+    if actual_margin is not None:
+        entries.append(("●", "Actual", forecast_margin_label(actual_margin, home, away, 0), forecast_result_colors()[0]))
+    if spread is not None:
+        entries.append(("□", "Spread", f"{home} {spread:+g}", neutral))
+    entries.append(("⋮", "Even score", "0 points", "#8b969e"))
+    items = "".join(
+        f'<span><span class="forecast-margin-symbol" style="--cue:{color}" aria-hidden="true">{symbol}</span>'
+        f'<span><b>{escape(label)}</b> · {escape(value)}</span></span>'
+        for symbol, label, value, color in entries
+    )
+    st.html(f'<div class="forecast-margin-key" aria-label="Point margin chart key">{items}</div>')
 
 
 def team_recent_form(team_games, home_id, away_id, when, names, colors):
@@ -1143,14 +1243,18 @@ def team_recent_form(team_games, home_id, away_id, when, names, colors):
     fig = px.line(
         recent, x="date", y="margin", color="team_name", markers=True, color_discrete_map=colors,
         line_dash="team_name", line_dash_map={names[away_id]: "dash", names[home_id]: "solid"},
-        hover_data=["opponent", "game_result"],
-        labels={"date": "Game date", "team_name": "Team", "margin": "Scoring margin (points)",
-                "opponent": "Opponent", "game_result": "Final score"},
+        custom_data=["team_name", "opponent", "game_result"],
+        labels={"date": "Game date", "team_name": "Team", "margin": "Scoring margin (points)"},
+    )
+    fig.update_traces(
+        hovertemplate="<b>%{customdata[0]} %{customdata[1]}</b><br>"
+                      "%{x|%b %d, %Y}<br>"
+                      "%{customdata[2]} · Margin %{y:+.0f} pts<extra></extra>"
     )
     fig.add_hline(y=0, line_color="#697681", line_dash="dot")
     fig.update_layout(height=350, margin=dict(l=45, r=15, t=40, b=52),
                       legend=dict(orientation="h", y=1.14, x=0))
-    fig.update_yaxes(tickformat=".0f", hoverformat="+.0f")
+    fig.update_yaxes(tickformat=".0f")
     show_chart(fig, use_container_width=True)
 
 
@@ -1168,7 +1272,12 @@ def forecast_matchup(names, version, latest, key="team", model_name="team"):
             return None
         earliest = cutoff.date() + timedelta(days=1)
         if mode == "Custom Matchup":
-            return custom_matchup(names, key, latest, compact=True, earliest=earliest)
+            latest_supported = None
+            if model_name == "player":
+                season_start = latest.year if latest.month >= 7 else latest.year - 1
+                latest_supported = datetime(season_start + 1, 6, 30).date()
+            return custom_matchup(names, key, latest, compact=True, earliest=earliest,
+                                  latest_supported=latest_supported)
 
     today = pd.Timestamp(datetime.now(ZoneInfo("America/Chicago")).date())
     is_upcoming = mode == "Upcoming Games"
@@ -1219,8 +1328,7 @@ def forecast_matchup(names, version, latest, key="team", model_name="team"):
             gid: f"{row.date:%b} {row.date.day} · {names[row.away_team_id]} at {names[row.home_team_id]}"
             for gid, row in slate.iterrows()
         }
-        game_id = game_picker.selectbox("Upcoming matchup", list(labels), format_func=labels.get, key=f"{key}_upcoming_game")
-        st.caption(f"Showing {len(days)} game {'date' if len(days) == 1 else 'dates'} in the schedule snapshot.")
+        game_label, game_key = "Upcoming matchup", f"{key}_upcoming_game"
     else:
         opponent = 0
         if team_id:
@@ -1261,7 +1369,14 @@ def forecast_matchup(names, version, latest, key="team", model_name="team"):
         day = day_picker.selectbox("Game day", list(days), format_func=days.get, key=f"{key}_past_date")
         slate = month_games.loc[month_games.date.eq(pd.Timestamp(day))].set_index("game_id")
         labels = {gid: f"{names[row.away_team_id]} at {names[row.home_team_id]}" for gid, row in slate.iterrows()}
-        game_id = game_picker.selectbox("Matchup", list(labels), format_func=labels.get, key=f"{key}_past_game")
+        game_label, game_key = "Matchup", f"{key}_past_game"
+    previous_game = st.session_state.get(game_key)
+    if previous_game not in labels:
+        # A date or filter change can leave the widget pointing at a game outside this slate.
+        st.session_state[game_key] = next(iter(labels))
+    game_id = game_picker.selectbox(game_label, list(labels), format_func=labels.get, key=game_key)
+    if is_upcoming:
+        st.caption(f"Showing {len(days)} game {'date' if len(days) == 1 else 'dates'} in the schedule snapshot.")
     selected = slate.loc[game_id]
     return selected.home_team_id, selected.away_team_id, selected.date.date()
 
@@ -1282,21 +1397,37 @@ def team_actual_result(version, home_id, away_id, when):
     return matches.iloc[0] if len(matches) == 1 else None
 
 
+def forecast_result_colors():
+    return ("#7fdfbe", "#ffb68b") if dark() else ("#12694f", "#9a3c14")
+
+
 def forecast_actual_score(actual, home, away, forecast):
-    st.write(f"**Actual final** · {away} {actual.away_points:.0f} · {home} {actual.home_points:.0f}")
-    if forecast is None:
-        return
-    home_chance = round(100 * forecast["home_win"], 1)
-    away_chance = round(100 * forecast["away_win"], 1)
-    if home_chance == away_chance:
-        st.caption("The forecast gave both teams the same displayed win chance.")
-        return
-    favorite = home if home_chance > away_chance else away
     winner = home if actual.home_points > actual.away_points else away
-    if favorite == winner:
-        st.caption(f"{favorite}, the forecast favorite, won.")
-    else:
-        st.caption(f"{winner} won. The forecast favored {favorite}.")
+    scores = []
+    for name, points in ((away, actual.away_points), (home, actual.home_points)):
+        score = f"{escape(name)} {points:.0f}"
+        if name == winner:
+            score = f'<strong class="forecast-winner">{score}<small class="forecast-winner-label">Winner</small></strong>'
+        scores.append(f"<span>{score}</span>")
+    score_line = '<span aria-hidden="true">·</span>'.join(scores)
+    verdict = ""
+    outcome = "even"
+    if forecast is not None:
+        home_chance, away_chance = forecast["home_win"], forecast["away_win"]
+        if home_chance == away_chance:
+            verdict = "Equal win chances"
+        else:
+            favorite = home if home_chance > away_chance else away
+            correct = favorite == winner
+            outcome = "correct" if correct else "missed"
+            verdict = "✓ Model correctly picked the winner" if correct else "✕ Model picked the wrong winner"
+    badge = f'<span class="forecast-verdict" data-result="{outcome}">{verdict}</span>' if verdict else ""
+    win_color, miss_color = forecast_result_colors()
+    st.html(
+        f'<div class="forecast-result" style="--result-win:{win_color};--result-miss:{miss_color}">'
+        f'<div class="forecast-final-heading"><h4>Final score</h4>{badge}</div>'
+        f'<div class="forecast-result-scores">{score_line}</div></div>'
+    )
 
 
 @st.cache_data(show_spinner=False)
@@ -1391,22 +1522,29 @@ def team_page(t, teams, version):
     if matchup_choice is None:
         return
     h, a, when = matchup_choice
-    st.caption(f"Forecast uses box scores before game day, available through {t.date.max():%b %d, %Y}.")
+    if st.session_state.get("team_matchup_mode") == "Past Games":
+        st.caption(f"This forecast uses only box scores from games played before {when:%b} {when.day}, {when.year}.")
+    else:
+        st.caption(f"Forecast uses box scores before game day, available through {t.date.max():%b %d, %Y}.")
     home, away = names[h], names[a]
     home_color, away_color = pair_colors(teams, h, a)
     colors = {away: away_color, home: home_color}
     actual = team_actual_result(version, h, a, when)
 
+    forecast_summary = st.container()
     spread_toggle, spread_input = st.columns([1, 1.3], vertical_alignment="bottom")
+    margin_heading = spread_toggle.empty()
     use_spread = spread_toggle.toggle("Include home spread", key="team_use_spread",
-                                      help="Adds the projected margin, its likely range and each side's chance to cover.")
-    spread = None
-    if use_spread:
-        spread = spread_input.number_input("Home spread", value=-4.5, step=.5, key="team_spread",
-                                           help="Negative means the home team is favored. −4.5 means it must win by 5 or more to cover.")
+                                      help="Adds a spread marker and each side’s chance to cover.")
+    spread_value = spread_input.number_input(
+        "Home spread", min_value=-60.0, max_value=60.0, value=-4.5, step=.5,
+        key="team_spread", disabled=not use_spread,
+        help="Enter a spread from −60 to +60. At −4.5, the home team must win by 5 or more to cover.",
+    )
+    spread = spread_value if use_spread else None
 
     result = None
-    progress = st.progress(0, text="Loading the forecast model…")
+    progress = forecast_summary.progress(0, text="Loading the forecast model…")
     try:
         model_path = APP.parent / "artifacts" / "team.pkl"
         modified = model_path.stat().st_mtime_ns
@@ -1415,34 +1553,31 @@ def team_page(t, teams, version):
         result = cached_team_forecast(version, modified, h, a, when, spread)
         progress.progress(100, text="Forecast ready")
     except (ValueError, FileNotFoundError) as exc:
-        st.warning(str(exc))
+        forecast_summary.warning(str(exc))
     finally:
         progress.empty()
 
     if result is not None:
-        st.subheader("Historical forecast" if actual is not None else "Matchup at a glance")
-        forecast_scoreboard(result, home, away, colors)
-        if actual is not None:
-            forecast_actual_score(actual, home, away, result)
-        st.write(f"**Projected total:** {result['total']:.1f} points")
-        if result["disagreement"]:
-            st.info("The projected score and the win chances favor different teams. Each comes from a separate model.")
+        with forecast_summary:
+            st.subheader("Historical forecast" if actual is not None else "Matchup at a glance")
+            forecast_scoreboard(result, home, away, colors)
+            if actual is not None:
+                forecast_actual_score(actual, home, away, result)
+            if result["disagreement"]:
+                st.info("The projected score and the win chances favor different teams. Each comes from a separate model.")
+        margin_heading.subheader("Point margin")
+        dist = result["distribution"]
+        actual_margin = actual.home_points - actual.away_points if actual is not None else None
+        codes = teams.set_index("team_id").team_code.to_dict()
+        projection_color = colors[home if result["margin"] >= 0 else away]
+        forecast_margin_key(result, codes[h], codes[a], projection_color, actual_margin, spread)
+        show_chart(forecast_margin_chart(result, home, away, colors, actual_margin, spread))
         if spread is not None:
-            st.subheader("Against the spread")
-            dist = result["distribution"]
-            st.write(f"**{home} {spread:+g}** · Home covers {dist['home_cover']:.0%} · "
+            st.write(f"**Spread outcomes** · Home covers {dist['home_cover']:.0%} · "
                      f"Away covers {dist['away_cover']:.0%} · Push {dist['push']:.0%}")
-            st.write(f"**Projected margin:** {forecast_margin_label(result['margin'], home, away)}")
-            low = forecast_margin_label(dist["low"], home, away, 0)
-            high = forecast_margin_label(dist["high"], home, away, 0)
-            st.write(f"Likely range (8 in 10 games like this one land here): **{low} to {high}**")
-            show_chart(forecast_margin_chart(result, home, away, colors))
-            st.caption("The diamond marks the projected margin and the dotted line an even score."
-                       + (" The range includes wins for either team." if dist["low"] < 0 < dist["high"] else ""))
-        else:
-            st.caption("Turn on **Include home spread** to see the projected margin, its likely range and cover chances.")
     elif actual is not None:
-        forecast_actual_score(actual, home, away, None)
+        with forecast_summary:
+            forecast_actual_score(actual, home, away, None)
 
     odds = APP / "odds_today.csv"
     with st.expander("Today's market lines"):
@@ -1552,101 +1687,298 @@ def player_accuracy(version):
 STAT_ABBR = {"points": "PTS", "rebounds": "REB", "assists": "AST"}
 
 
-def player_card(name, team, side, color, frame):
+def player_average_label(count):
+    if count == 0:
+        return "Training average"
+    return "Last-10 average" if count >= 10 else f"{count}-game average"
+
+
+def player_card(name, team, side, color, frame, recent_counts, actual=None):
     stats = []
-    for row in frame.itertuples():
+    projections = {} if frame is None else {row.stat: row for row in frame.itertuples()}
+    for stat, label in STAT_ABBR.items():
+        row = projections.get(stat)
+        actual_label = ""
+        if actual is not None:
+            value = actual[stat]
+            actual_label = f'<span class="player-actual">Actual {value:.0f}</span>' if pd.notna(value) else '<span>Actual —</span>'
+        projection = ""
+        if row is not None:
+            average = player_average_label(recent_counts[stat])
+            projection = (f'<strong>{row.prediction:.1f}</strong><span>Range {row.low:.0f}–{row.high:.0f}</span>'
+                          f'<span>{average} {row.baseline:.1f}</span>')
         stats.append(
-            f'<div class="ciq-stat"><b>{STAT_ABBR.get(row.stat, escape(row.stat.upper()))}</b><strong>{row.prediction:.1f}</strong>'
-            f'<span>Range {row.low:.0f}–{row.high:.0f}</span><span>Last-10 avg {row.baseline:.1f}</span></div>')
-    return (f'<article class="ciq-card" style="--accent:{color}"><small>{side} · {escape(team)}</small>'
-            f'<h4>{escape(name)}</h4><div class="ciq-stat-row">{"".join(stats)}</div></article>')
+            f'<div class="ciq-stat"><b>{label}</b>{projection}{actual_label}</div>')
+    badge = ""
+    if frame is None:
+        badge = ('<span class="player-projection-warning"><span aria-hidden="true">⚠</span> '
+                 'Projection unavailable</span>')
+    tiles = f'<div class="ciq-stat-row">{"".join(stats)}</div>' if frame is not None or actual is not None else ""
+    return (f'<article class="ciq-card" style="--accent:{color}">'
+            f'<div class="player-card-team"><small>{side} · {escape(team)}</small>{badge}</div>'
+            f'<h4>{escape(name)}</h4>'
+            f'{tiles}</article>')
+
+
+def player_projection_charts(sides, recent_counts, actual=None):
+    import plotly.graph_objects as go
+
+    ink = DARK_CHART["text"] if dark() else "#334651"
+    grid = DARK_CHART["grid"] if dark() else "#e0e4e7"
+    labels = [name for name, _, _ in sides]
+    by_stat = [
+        frame.set_index("stat") if frame is not None else
+        pd.DataFrame(index=list(STAT_ABBR), columns=["prediction", "baseline", "low", "high"], dtype=float)
+        for _, _, frame in sides
+    ]
+    captions = []
+    if any(frame is not None for _, _, frame in sides):
+        captions.append("Bars show the **projection**, circles mark the **comparison average**, "
+                        "and capped lines show the **likely range (80%)**.")
+    if actual is not None and actual.notna().any().any():
+        captions.append("Green diamonds mark **actual results**.")
+    if captions:
+        st.caption(" ".join(captions))
+    for column, stat in zip(st.columns(3), STAT_ABBR):
+        values = [frame.loc[stat] for frame in by_stat]
+        baseline_labels = recent_counts[stat].map(player_average_label)
+        figure = go.Figure(go.Bar(
+            x=[0, 1], y=[row.prediction for row in values], orientation="v", width=.55,
+            marker_color=[color for _, color, _ in sides], opacity=.65,
+            customdata=[[label, row.baseline, row.low, row.high, baseline_label]
+                        for label, row, baseline_label in zip(labels, values, baseline_labels)],
+            hovertemplate="<b>%{customdata[0]}</b><br>Projection: %{y:.1f}<br>"
+                          "%{customdata[4]}: %{customdata[1]:.1f}<br>"
+                          "80% range: %{customdata[2]:.1f}–%{customdata[3]:.1f}<extra></extra>",
+        ))
+        for x, row in enumerate(values):
+            if pd.isna(row.prediction):
+                continue
+            figure.add_trace(go.Scatter(
+                x=[x, x, None, x - .09, x + .09, None, x - .09, x + .09],
+                y=[row.low, row.high, None, row.low, row.low, None, row.high, row.high],
+                mode="lines", line=dict(color=ink, width=2), hoverinfo="skip",
+            ))
+        figure.add_trace(go.Scatter(
+            x=[-.18, .82], y=[row.baseline for row in values], mode="markers",
+            marker=dict(symbol="circle-open", size=12, color=ink, line=dict(width=2)),
+            customdata=list(zip(labels, baseline_labels)),
+            hovertemplate="<b>%{customdata[0]}</b><br>%{customdata[1]}: %{y:.1f}<extra></extra>",
+        ))
+        maximum = max([1, *(max(row.prediction, row.baseline, row.high) for row in values if pd.notna(row.prediction))])
+        if actual is not None:
+            actual_points = [(value, x, label) for value, x, label in zip(actual[stat], (0, 1), labels) if pd.notna(value)]
+            if actual_points:
+                scores, levels, names = zip(*actual_points)
+                maximum = max(maximum, *scores)
+                comparisons = []
+                for score, x in zip(scores, levels):
+                    prediction = values[x].prediction
+                    comparison = ""
+                    if pd.notna(prediction):
+                        difference = round(score - prediction, 1)
+                        if difference == 0:
+                            outcome = "Matched projection"
+                        else:
+                            direction = "above" if difference > 0 else "below"
+                            outcome = f"{abs(difference):.1f} {direction} projection"
+                        comparison = f"<br>Projected: {prediction:.1f}<br>{outcome}"
+                    comparisons.append(comparison)
+                figure.add_trace(go.Scatter(
+                    x=[x + .18 for x in levels], y=scores, mode="markers", name="Actual",
+                    marker=dict(symbol="diamond", size=11, color=forecast_result_colors()[0]), cliponaxis=False,
+                    text=names, customdata=comparisons,
+                    hovertemplate="<b>%{text}</b><br>Actual: %{y:.0f}%{customdata}<extra></extra>",
+                ))
+        figure.update_layout(
+            title=dict(text=stat.title(), x=.5, font=dict(size=15)), height=320,
+            margin=dict(l=31, r=12, t=35, b=8), showlegend=False,
+        )
+        figure.update_xaxes(range=[-.5, 1.5], showticklabels=False, showgrid=False, fixedrange=True)
+        figure.update_yaxes(range=[0, maximum * 1.08], nticks=6, showgrid=True, gridcolor=grid,
+                            ticks="outside", tickformat="~g", fixedrange=True)
+        with column:
+            show_chart(figure, theme=None, config={"displayModeBar": False})
+            name_labels = "".join(f'<span>{escape(name)}</span>' for name in labels)
+            st.html(f'<div class="player-chart-labels">{name_labels}</div>')
 
 
 def player_page(p, t, teams, version):
     st.html(TEAM_FORECAST_STYLE)
+    edge_color, warning_color = forecast_result_colors()
+    st.html(f"""<style>
+    .ciq-table strong.player-stat-edge {{
+        display:inline-block; white-space:nowrap; padding:.06rem .32rem; border-radius:.3rem;
+        color:{edge_color} !important;
+        background:color-mix(in srgb,{edge_color} 14%,transparent);
+        border:1px solid color-mix(in srgb,{edge_color} 42%,transparent);
+    }}
+    .ciq-stat .player-actual {{color:{edge_color};font-weight:700;margin-top:.3rem;}}
+    .player-chart-labels {{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+        padding:0 12px 0 31px;margin-top:-.65rem;text-align:center;font-size:.82rem;line-height:1.25;}}
+    .player-chart-labels span {{padding:0 .2rem;overflow-wrap:anywhere;}}
+    .player-card-team {{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .5rem;}}
+    .player-projection-warning {{display:inline-block;padding:.1rem .45rem;border-radius:999px;
+        font-size:.78rem;font-weight:650;color:{warning_color};
+        background:color-mix(in srgb,{warning_color} 14%,transparent);
+        border:1px solid color-mix(in srgb,{warning_color} 48%,transparent);}}
+    </style>""")
     st.header("Player Matchups")
     page_intro("Pick a game, then one player from each team, to compare their projected points, rebounds and assists.",
                ["Find a game", "Pick a player on each team", "Compare projections and past meetings"])
     names = teams.set_index("team_id").team_name.to_dict()
     codes = teams.set_index("team_id").team_code.to_dict()
-    choice = forecast_matchup(names, version, p.date.max(), key="player", model_name="player")
+    choice = forecast_matchup(names, version, p.loc[p.played, "date"].max(), key="player", model_name="player")
     if choice is None:
         return
     home, away, when = choice
-    st.caption(f"Projections use box scores before game day, available through {p.date.max():%b %d, %Y}.")
     prior = p[p.date.lt(pd.Timestamp(when)) & p.played]
     ordered = prior.sort_values(["date", "game_id"])
-    roster = ordered.drop_duplicates("player_id", keep="last").copy()
+    season_start = when.year if when.month >= 7 else when.year - 1
+    game = team_actual_result(version, home, away, when)
+    is_custom = st.session_state.get("player_matchup_mode") == "Custom Matchup"
+    offseason = False
+    fallback_teams = []
+    date_hint = ""
+    notes = []
+    if game is not None:
+        roster = p.loc[p.game_id.eq(game.game_id) & p.played & p.team_id.isin([home, away])].copy()
+        source = "Player lists show recorded appearances for this game."
+    else:
+        roster = ordered.drop_duplicates("player_id", keep="last")
+        roster = roster.loc[roster.team_id.isin([home, away])].copy()
+        roster = roster.loc[roster.season_start.eq(roster.groupby("team_id").season_start.transform("max"))]
+        fallback_teams = roster.loc[roster.season_start.lt(season_start), "team_id"].unique()
+        source = "Player lists use each player’s last recorded team. Trades, injuries, and lineup changes can affect who plays."
+        if len(fallback_teams):
+            fallback_names = ", ".join(names[team_id] for team_id in fallback_teams)
+            source = f"Player lists use last-known teams, with prior-season data for {fallback_names}. Rosters and availability may differ."
+        if is_custom:
+            dates = t.loc[t.season_start.eq(season_start), "date"]
+            completed = json.loads((APP / "manifest.json").read_text())["latest_completed_start"]
+            day = pd.Timestamp(when)
+            offseason = (
+                when.month in (7, 8, 9)
+                or (not dates.empty and day < dates.min())
+                or (season_start <= completed and not dates.empty and day > dates.max())
+            )
+            date_hint = "Try a regular-season date after both players have a recorded game."
+            tasks = bundle("player", version)["tasks"]
+            cutoff = max(pd.Timestamp(task["inference_available_after"]) for task in tasks.values())
+            ranges = t.loc[t.date.gt(cutoff)].groupby("season_start").date.agg(["min", "max"])
+            if not ranges.empty:
+                distances = (ranges["min"] - day).clip(lower=pd.Timedelta(0)) + (
+                    day - ranges["max"]
+                ).clip(lower=pd.Timedelta(0))
+                start, end = ranges.loc[distances.idxmin(), ["min", "max"]]
+                date_hint = (
+                    "Try regular-season dates after both players’ first recorded games "
+                    f"({start:%b} {start.day}, {start.year}–{end:%b} {end.day}, {end.year})."
+                )
+            if offseason:
+                date_hint = "Projections are unavailable on offseason dates. " + date_hint
     recent = ordered.groupby("player_id").tail(10)
     roster["recent_minutes"] = roster.player_id.map(recent.groupby("player_id").minutes.mean())
-    roster = roster[roster.season_start.eq(roster.season_start.max())]
     away_col, home_col = st.columns(2)
     with away_col:
         b = choose(roster[roster.team_id.eq(away)], "p_b", f"Away player · {names[away]}")
     with home_col:
         a = choose(roster[roster.team_id.eq(home)], "p_a", f"Home player · {names[home]}")
-    st.caption("Players are listed by recent minutes with their last recorded team. "
-               "Injuries, availability and who guards whom aren't in the box scores.")
+    status = st.empty()
+    latest = p.date.max()
     if a is None or b is None:
-        st.info("No supported historical roster for this date.")
+        notes.append("The data doesn’t provide a player list for both teams.")
+        if date_hint:
+            notes.append(date_hint)
+        status.warning("**Matchup status.** " + source + "\n\n" +
+                       "\n\n".join(notes))
         return
     player_names = roster.set_index("player_id").player_name
     home_color, away_color = pair_colors(teams, home, away)
 
-    left = right = None
-    progress = st.progress(0, text="Loading the projection model…")
-    try:
-        modified = (APP.parent / "artifacts" / "player.pkl").stat().st_mtime_ns
-        model("player", version, modified)
-        progress.progress(35, text=f"Projecting {player_names[a]}…")
-        left = cached_player_forecast(version, modified, a, away, when, True)
-        progress.progress(70, text=f"Projecting {player_names[b]}…")
-        right = cached_player_forecast(version, modified, b, home, when, False)
-        progress.progress(100, text="Projections ready")
-    except (ValueError, FileNotFoundError) as exc:
-        st.warning(str(exc))
-    finally:
-        progress.empty()
+    same_season = ordered.loc[ordered.season_start.eq(season_start) & ordered.player_id.isin([b, a])]
+    eligible = set(same_season.player_id)
+    if not offseason:
+        missing = [player_names[pid] for pid in (b, a) if pid not in eligible]
+        if missing:
+            notes.append(f"No projection for {', '.join(missing)}. A projection requires an earlier recorded game that season.")
+    recent_counts = (same_season.groupby("player_id").tail(10)
+                     .groupby("player_id")[list(STAT_ABBR)].count().reindex([b, a], fill_value=0))
+    forecasts = {}
+    if eligible and not offseason:
+        progress = st.progress(0, text="Loading the projection model…")
+        try:
+            modified = (APP.parent / "artifacts" / "player.pkl").stat().st_mtime_ns
+            for position, (pid, opponent, is_home) in enumerate(((b, home, False), (a, away, True)), start=1):
+                if pid in eligible:
+                    progress.progress(35 * position, text=f"Projecting {player_names[pid]}…")
+                    try:
+                        forecasts[pid] = cached_player_forecast(version, modified, pid, opponent, when, is_home)
+                    except (ValueError, FileNotFoundError) as exc:
+                        notes.append(f"No projection for {player_names[pid]}. {exc}")
+        except FileNotFoundError as exc:
+            notes.append("Player projections are unavailable because the model file is missing.")
+        finally:
+            progress.empty()
 
-    if left is not None and right is not None:
-        st.subheader("Projected stat line")
-        st.html('<div class="ciq-cards">'
-                + player_card(player_names[b], names[away], "Away", away_color, right)
-                + player_card(player_names[a], names[home], "Home", home_color, left) + "</div>")
-        result = pd.concat([right.assign(player=player_names[b]), left.assign(player=player_names[a])])
-        result["stat"] = result.stat.str.title()
-        result["upper"] = result.high - result.prediction
-        result["lower"] = result.prediction - result.low
-        chart = px.bar(result, x="stat", y="prediction", color="player", barmode="group",
-                       error_y="upper", error_y_minus="lower",
-                       color_discrete_map={player_names[a]: home_color, player_names[b]: away_color},
-                       hover_data={"baseline": ":.1f", "upper": False, "lower": False},
-                       labels={"stat": "Stat", "prediction": "Projected", "player": "Player",
-                               "baseline": "Last-10 average"})
-        chart.update_traces(marker_line_width=0, error_y_color="#5b6a74", error_y_thickness=1.6, error_y_width=7)
-        chart.update_layout(height=340, bargap=.3, bargroupgap=.08, legend=dict(orientation="h", y=1.12),
-                            margin=dict(l=40, r=15, t=30, b=40))
-        show_chart(chart)
-        st.caption("Bars show the projection; whiskers show the likely range (8 in 10 past games landed inside it). "
-                   "Last-10 average is each player's average over his previous 10 games this season.")
+    if forecasts:
+        source += f" Projections use earlier box scores, with data available through {latest:%b %d, %Y}."
+    elif date_hint and (offseason or not eligible):
+        if not offseason:
+            first_games = p.loc[
+                p.played & p.season_start.eq(season_start) & p.player_id.isin([b, a])
+            ].groupby("player_id").date.min()
+            if len(first_games) == 2 and first_games.max() < latest:
+                first_supported_day = first_games.max() + timedelta(days=1)
+                date_hint = (
+                    f"Try {first_supported_day:%b} {first_supported_day.day}, {first_supported_day.year} "
+                    "or a later date in the same regular season, after both players have a recorded game."
+                )
+        notes.append(date_hint)
+    if notes or len(fallback_teams):
+        status.warning("\n\n".join(["**Matchup status.** " + source, *notes]))
+    else:
+        status.caption("**Matchup status.** " + source)
+    actual = roster.set_index("player_id")[list(STAT_ABBR)].loc[[b, a]] if game is not None else None
+    if actual is None and not forecasts:
+        st.subheader("Selected players")
+    elif forecasts:
+        st.subheader("Projected and actual stat lines" if actual is not None else "Projected stat line")
+    else:
+        st.subheader("Actual stat lines")
+    cards = [
+        player_card(player_names[pid], names[team_id], side, color, forecasts.get(pid), recent_counts.loc[pid],
+                    actual.loc[pid] if actual is not None else None)
+        for pid, team_id, side, color in ((b, away, "Away", away_color), (a, home, "Home", home_color))
+    ]
+    st.html(f'<div class="ciq-cards">{"".join(cards)}</div>')
+    if forecasts or (actual is not None and actual.notna().any().any()):
+        player_projection_charts([
+            (player_names[b], away_color, forecasts.get(b)),
+            (player_names[a], home_color, forecasts.get(a)),
+        ], recent_counts, actual)
 
     meetings = player_meetings(p, b, a, when)
     st.subheader("Past meetings")
     if meetings.empty:
-        st.info(f"{player_names[a]} and {player_names[b]} haven't played against each other in this snapshot. "
-                "The projections rely on each player's recent games and the opposing team's defense.")
+        st.info(f"{player_names[a]} and {player_names[b]} haven't played against each other in this snapshot.")
     else:
         st.write(f"**{len(meetings)}** earlier {'game' if len(meetings) == 1 else 'games'} with both players "
                  "on opposite teams, newest first.")
+        st.caption("Boxed values mark the higher stat in each game.")
         display = pd.DataFrame({
             "date": meetings.date.map(lambda d: f"{d:%b} {d.day}, {d.year}"),
             "game": [f"{codes.get(x, '?')} vs {codes.get(y, '?')}" for x, y in zip(meetings.team_id_a, meetings.team_id_b)],
             **{f"{stat}_{side}": meetings[f"{stat}_{side}"].map(lambda v: "—" if pd.isna(v) else f"{v:.0f}")
                for side in ("a", "b") for stat in ("points", "rebounds", "assists", "minutes")},
         })
+        higher = {
+            f"{stat}_{side}": meetings[f"{stat}_{side}"].gt(meetings[f"{stat}_{other}"]).fillna(False).tolist()
+            for stat in STAT_ABBR for side, other in (("a", "b"), ("b", "a"))
+        }
         html_table(display, headers=["Date", "Teams", *(["PTS", "REB", "AST", "MIN"] * 2)],
                    groups=[("", 2), (player_names[b], 4), (player_names[a], 4)],
-                   numeric=[c for c in display.columns if c[-2:] in ("_a", "_b")])
+                   numeric=[c for c in display.columns if c[-2:] in ("_a", "_b")], higher=higher)
         if len(meetings) < 3:
             st.caption("Only a few meetings, so treat these as anecdotes rather than a trend.")
     player_accuracy(version)
@@ -1655,24 +1987,72 @@ def player_page(p, t, teams, version):
             f"""
 - **Projection** — The model's expected points, rebounds and assists, using each player's recent games, rest, home court and the opponent's defense and pace.
 - **Range** — Based on how far past projections missed. 8 in 10 past games landed inside it.
-- **Last-10 average** — The player's average over his previous 10 games this season. It's a simple yardstick to compare the projection with.
+- **Comparison average** — The player's average over up to 10 earlier games that season. The label shows how many games were used. A projection requires an earlier recorded appearance that season.
 - **Past meetings** — Games where both players appeared for opposing teams. Box scores don't show who guarded whom.
 - **Coverage** — Projections only use games before the selected date. [Historical NBA box scores]({SOURCE_NBA})
             """
         )
 
 
-def breakout_accuracy(version):
+@st.cache_data(show_spinner=False)
+def breakout_history(seasons):
+    return season_features(seasons)
+
+
+def breakout_accuracy(version, history):
     path = APP / "backtest_breakout_breakout.csv.gz"
     if not path.exists():
         return
     test = table("backtest_breakout_breakout", version).query("period == 'test'")
-    top = test.nlargest(15, "prediction")
+    if test.empty:
+        return
+    test = test.sort_values("prediction", ascending=False, kind="stable").reset_index(drop=True)
+    test["rank"] = test.index + 1
+    top = test.head(15)
     hits = int(top.actual.sum())
     rate = test.actual.mean()
+    outcome_start = int(test.season_start.iloc[0])
+    outcome = f"{outcome_start}-{(outcome_start + 1) % 100:02d}"
+    baseline = f"{outcome_start - 1}-{outcome_start % 100:02d}"
+    st.subheader(f"How the model did in {outcome}")
+    st.write(f"The model ranked candidates using {baseline} stats, then checked who met all three breakout criteria in {outcome}.")
+    st.html(
+        '<div class="ciq-cards">'
+        '<article class="ciq-card breakout-score" style="--accent:#a8441a">'
+        f'<strong>{hits} of {len(top)}</strong><span>top picks broke out</span>'
+        '</article>'
+        '<article class="ciq-card breakout-score" style="--accent:#317aca">'
+        f'<strong>{rate:.1%}</strong><span>of all test players broke out '
+        f'({int(test.actual.sum())} of {len(test)})</span></article></div>'
+    )
+
+    def change(before, after):
+        if pd.isna(before) or pd.isna(after):
+            return "—"
+        return f"{after - before:+.1f}", f"{before:.1f} → {after:.1f}"
+
+    prior = history.loc[history.season_start.eq(outcome_start - 1)].set_index("player_id")
+    final = history.loc[history.season_start.eq(outcome_start)].set_index("player_id")
+    hits_table = test.loc[test.actual.eq(1)].set_index("player_id")
+    before, after = prior.reindex(hits_table.index), final.reindex(hits_table.index)
+    rows = pd.DataFrame({
+        "Rank": hits_table["rank"],
+        "Player": after.player_name.fillna(before.player_name),
+        "Minutes per game": [change(a, b) for a, b in zip(before.mpg, after.mpg)],
+        "Production percentile": [change(a, b) for a, b in zip(before.pra_pctl, after.pra_pctl)],
+        "Predicted chance": hits_table.prediction.map(breakout_chance_label),
+    })
+    comparison_columns = ("Minutes per game", "Production percentile")
+    number_columns = {"Rank", "Predicted chance", *comparison_columns}
+    if not rows.empty:
+        st.markdown(f"**Players who broke out in {outcome}**")
+        st.caption(
+            f"Stats compare {baseline} → {outcome}. Rank and chance come from the preseason test predictions."
+            + (f" Shaded rows mark top-{len(top)} picks." if hits else "")
+        )
+        html_table(rows, numeric=number_columns, stacked=comparison_columns,
+                   highlight=rows["Rank"].le(len(top)).tolist())
     with st.expander("How accurate is Breakout Watch?"):
-        season = str(test.season.iloc[0])
-        outcome = f"{int(season[:4]) + 1}-{str(int(season[:4]) + 2)[-2:]}"
         st.write(f"We tested the model on {len(test):,} players heading into the {outcome} season. "
                  "It never saw that season while it was being built.")
         st.markdown(
@@ -1684,32 +2064,172 @@ def breakout_accuracy(version):
         evaluation_downloads("breakout")
 
 
+def breakout_chance_label(probability):
+    if probability < .001:
+        return "<0.1%"
+    return f"{probability:.1%}" if probability < .1 else f"{probability:.0%}"
+
+
+def breakout_progress(history, selected, upcoming, forecast_start, version):
+    season_players = history.loc[history.season_start.eq(forecast_start)]
+    latest_completed = json.loads((APP / "manifest.json").read_text())["latest_completed_start"]
+    games = table("player_games", version)
+    through = games.loc[games.season_start.eq(forecast_start) & games.played, "date"].max()
+    provisional = False
+    if forecast_start > latest_completed and not season_players.empty:
+        team_games = table("team_games", version)
+        counts = team_games.loc[team_games.season.eq(upcoming)].groupby("team_id").game_id.nunique()
+        provisional = counts.reindex(table("teams", version).team_id, fill_value=0).lt(20).any()
+    min_games = 5 if provisional else 20
+    hist = history.loc[history.player_id.eq(selected.player_id) & history.season_start.le(forecast_start)].copy()
+    if provisional:
+        eligible = season_players.games.ge(min_games) & season_players.mpg.ge(15)
+        ranks = season_players.pra_per36.where(eligible).rank(method="average", pct=True) * 100
+        hist.loc[hist.season_start.eq(forecast_start), "pra_pctl"] = ranks.reindex(hist.index)
+    current_rows = hist.loc[hist.season_start.eq(forecast_start)]
+    current = current_rows.iloc[0] if not current_rows.empty else None
+    targets = {
+        "mpg": max(20, selected.mpg + 5),
+        "pra_pctl": selected.pra_pctl + 15,
+    }
+    metrics = {"mpg": "Minutes per game", "pra_pctl": "Production percentile", "pra_per36": "Production per 36"}
+    colors = {"mpg": "#317aca", "pra_pctl": "#bd652e", "pra_per36": "#168458"}
+    cards = []
+    for metric, target in targets.items():
+        value = current[metric] if current is not None else float("nan")
+        current_label = f"{value:.1f}" if pd.notna(value) else '<span aria-label="Unavailable">—</span>'
+        if pd.notna(value):
+            current_rounded, previous_rounded = round(value, 1), round(selected[metric], 1)
+            direction, symbol = ("up", "↑") if current_rounded > previous_rounded else (
+                ("down", "↓") if current_rounded < previous_rounded else ("flat", "→")
+            )
+            description = {"up": "Higher", "down": "Lower", "flat": "Unchanged"}[direction]
+            current_label += (
+                f' <span class="breakout-direction {direction}" role="img"'
+                f' aria-label="{description} compared with last season" title="{description} compared with last season">{symbol}</span>'
+            )
+        current_context = (
+            ' · provisional<sup>*</sup>'
+            if metric == "pra_pctl" and provisional and pd.notna(value) else ""
+        )
+        context = ""
+        if metric == "pra_pctl" and pd.isna(value):
+            if current is None:
+                reason = "no games recorded this season"
+            else:
+                unmet = []
+                if current.games < min_games:
+                    unmet.append(f"{int(current.games)} games played ({min_games} required)")
+                if pd.notna(current.mpg) and current.mpg < 15:
+                    unmet.append(f"{current.mpg:.1f} MPG (15 MPG required)")
+                reason = " and ".join(unmet) or "season stats are incomplete"
+            context = f"<small>No production rank yet: {reason}.</small>"
+        cards.append(
+            f'<article class="ciq-card" style="--accent:{colors[metric]}"><h4>{metrics[metric]}</h4>'
+            '<dl class="breakout-comparison">'
+            f'<div><dt>Last season</dt><dd>{selected[metric]:.1f}</dd></div>'
+            f'<div class="breakout-current"><dt>This season{current_context}</dt><dd>{current_label}</dd></div>'
+            f'<div><dt>Target</dt><dd>{target:.1f}</dd></div>'
+            f'</dl>{context}</article>'
+        )
+    st.html(f"""
+        <style>
+        .breakout-comparison {{margin:0 0 .3rem;}}
+        .breakout-comparison > div {{display:flex;flex-wrap:wrap;justify-content:space-between;
+            align-items:baseline;gap:.15rem .6rem;padding:.26rem .45rem;}}
+        .breakout-comparison dd {{margin:0;font-weight:650;font-variant-numeric:tabular-nums;}}
+        .breakout-current {{background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:.35rem;}}
+        </style>
+        <div class="ciq-cards">{"".join(cards)}</div>
+    """)
+    raw = f"{current.pra_per36:.1f}" if current is not None and pd.notna(current.pra_per36) else "Unavailable"
+    st.caption(f"**Production per 36 min this season:** {raw} · Points + rebounds + assists")
+    in_progress = hist.season_start.eq(forecast_start) & (forecast_start > latest_completed)
+    for column, (metric, label) in zip(st.columns(3), metrics.items()):
+        with column:
+            completed = hist.assign(**{metric: hist[metric].mask(in_progress)})
+            line = px.line(completed, x="season", y=metric, markers=True,
+                           color_discrete_sequence=[colors[metric]])
+            hover = f"%{{x}}<br>{label}: %{{y:.1f}}<extra></extra>"
+            line.update_traces(connectgaps=False, hovertemplate=hover)
+            if in_progress.any() and pd.notna(current[metric]):
+                previous = hist.loc[hist.season_start.eq(forecast_start - 1) & hist[metric].notna()]
+                if not previous.empty:
+                    line.add_scatter(
+                        x=[previous.iloc[0].season, current.season],
+                        y=[previous.iloc[0][metric], current[metric]], mode="lines",
+                        line=dict(color=colors[metric], dash="dot"), hoverinfo="skip", showlegend=False,
+                    )
+                line.add_scatter(
+                    x=[current.season], y=[current[metric]], mode="markers",
+                    marker=dict(color=colors[metric], symbol="circle-open"), hovertemplate=hover, showlegend=False,
+                )
+            if metric in targets:
+                line.add_hline(y=targets[metric], line_dash="dash", line_color=colors[metric],
+                               annotation_text=f"Target {targets[metric]:.1f}", annotation_position="top left")
+            if metric == "pra_pctl":
+                line.update_yaxes(range=[0, 100])
+            line.update_yaxes(title=None, nticks=5)
+            line.update_xaxes(type="category", title=None, nticks=4, tickangle=0)
+            line.update_layout(title=dict(text=label, font=dict(size=14), x=.02),
+                               height=185, margin=dict(l=34, r=14, t=32, b=28))
+            show_chart(line, config={"displayModeBar": False})
+    if provisional:
+        st.html(
+            '<small style="display:block">'
+            f'<b>* Early-season rankings.</b> {ranks.count()} players qualify with {min_games}+ games and 15+ minutes per game. '
+            'Percentiles can shift as more players qualify. The tracker returns to the standard 20-game minimum '
+            'once every team has 20 recorded games. Last season’s baseline and the official target use the standard cutoff.</small>'
+        )
+    if pd.notna(through):
+        st.caption(
+            f"The current-season progress metrics use {upcoming} NBA box scores "
+            f"from games played through {through:%b} {through.day}, {through.year}."
+        )
+
+
 def breakout_page(seasons, version):
     st.header("Breakout Watch")
+    up, down = forecast_result_colors()
+    st.html(f"""<style>
+    .breakout-score strong,.breakout-chance strong {{display:block;font-size:clamp(1.65rem,4vw,2.3rem);line-height:1.2;}}
+    .breakout-score > span {{font-size:.9rem;}}
+    .ciq-cell-detail {{margin-inline-start:.45rem;font-size:.78rem;opacity:.8;}}
+    .breakout-direction {{margin-inline-start:.25rem;font-weight:700;}}
+    .breakout-direction.up {{color:{up};}}
+    .breakout-direction.down {{color:{down};}}
+    </style>""")
     path = APP / "breakout_candidates.csv.gz"
     if not path.exists():
         st.info("Breakout model not prepared. Run the offline training command.")
         return
     f = table("breakout_candidates", version)
-    upcoming = f"{int(f.season_start.max()) + 1}-{str(int(f.season_start.max()) + 2)[-2:]}"
+    if f.empty:
+        st.info("No breakout candidates are available.")
+        return
+    forecast_start = int(f.season_start.max()) + 1
+    upcoming = f"{forecast_start}-{(forecast_start + 1) % 100:02d}"
+    history = breakout_history(seasons)
     page_intro(f"See which players the model thinks are most likely to take a big leap in {upcoming}.",
                ["Scan the top 10", "Pick a player to see his track record", "Check how past picks did"])
     st.html(
         '<div class="ciq-card" style="--accent:#a8441a"><b>What counts as a breakout?</b>'
         '<div class="ciq-stat-row" style="margin-top:.5rem">'
-        '<div class="ciq-stat"><b>MINUTES</b><strong>20+</strong><span>per game next season</span></div>'
-        '<div class="ciq-stat"><b>MORE PLAYING TIME</b><strong>+5</strong><span>minutes per game or more</span></div>'
-        '<div class="ciq-stat"><b>PRODUCTION</b><strong>+15</strong><span>percentile points in points + rebounds + assists per 36 min</span></div>'
-        '</div></div>')
+        '<div class="ciq-stat"><b>PLAYING TIME</b><strong>20+ MPG</strong><span>Season average</span></div>'
+        '<div class="ciq-stat"><b>PLAYING TIME GAIN</b><strong>+5 MPG</strong><span>Vs. last season</span></div>'
+        '<div class="ciq-stat"><b>PRODUCTION RANK GAIN</b><strong>+15</strong><span>Percentile points</span></div>'
+        '</div><small style="display:block;margin-top:.5rem">All three are required. '
+        'Production ranks points + rebounds + assists per 36 min among eligible NBA players.</small></div>')
     st.caption(f"Estimates use stats through the {f.season.iloc[0]} season. Rookies are excluded. "
                "Chances are model estimates, not guarantees.")
     st.subheader("Top 10 breakout chances")
-    leaders = f.nlargest(10, "probability").sort_values("probability")
-    chart = px.bar(leaders, x="probability", y="player_name", orientation="h", text="probability",
+    leaders = f.nlargest(10, "probability").sort_values("probability").copy()
+    leaders["chance"] = leaders.probability.map(breakout_chance_label)
+    chart = px.bar(leaders, x="probability", y="player_name", orientation="h", text="chance",
                    labels={"probability": "Estimated breakout chance", "player_name": "Player"},
                    color_discrete_sequence=["#a8441a"])
-    chart.update_traces(texttemplate="%{x:.0%}", textposition="outside", cliponaxis=False,
-                        hovertemplate="%{y}: %{x:.0%}<extra></extra>")
+    chart.update_traces(textposition="outside", cliponaxis=False,
+                        hovertemplate="%{y}: %{text}<extra></extra>")
     chart.update_xaxes(tickformat=".0%", range=[0, min(1, leaders.probability.max() * 1.18)])
     chart.update_yaxes(title_text=None, automargin=True)
     chart.update_layout(height=400, margin=dict(l=10, r=40, t=40, b=40), bargap=.35)
@@ -1719,21 +2239,10 @@ def breakout_page(seasons, version):
     if pid is not None:
         selected = f[f.player_id.eq(pid)].iloc[0]
         rank = int(f.probability.rank(ascending=False, method="min")[f.player_id.eq(pid)].iloc[0])
-        hist = scouting.canonical(seasons)
-        hist = hist[hist.player_id.eq(pid)].sort_values("season_start")
         st.html(
             f'<div class="ciq-card" style="--accent:#a8441a"><small>Rank #{rank} of {len(f)}</small>'
-            f'<h4>{escape(selected.player_name)}</h4><div class="ciq-stat-row">'
-            f'<div class="ciq-stat"><b>BREAKOUT CHANCE</b><strong>{selected.probability:.0%}</strong></div>'
-            f'<div class="ciq-stat"><b>MINUTES / GAME</b><strong>{selected.mpg:.1f}</strong><span>{selected.season}</span></div>'
-            f'<div class="ciq-stat"><b>PTS+REB+AST / 36</b><strong>{selected.pra_per36:.1f}</strong><span>{selected.season}</span></div>'
-            '</div></div>')
-        trend = hist.rename(columns={"mpg": "Minutes per game", "pra_per36": "Points + rebounds + assists per 36"})
-        line = px.line(trend, x="season", y=["Minutes per game", "Points + rebounds + assists per 36"], markers=True,
-                       labels={"variable": "Measure", "value": "Season average", "season": "Season"},
-                       color_discrete_sequence=["#1f5bab", "#a8441a"])
-        line.for_each_trace(lambda trace: trace.update(line_dash="dash") if trace.name.startswith("Points") else None)
-        line.update_layout(height=320, legend=dict(orientation="h", y=1.15), margin=dict(l=40, r=15, t=30, b=40))
-        show_chart(line)
-        st.caption("Season averages for every season in the data. The current season isn't part of the estimate.")
-    breakout_accuracy(version)
+            f'<h4>{escape(selected.player_name)}</h4><div class="breakout-chance">'
+            f'<strong>{escape(breakout_chance_label(selected.probability))}</strong>'
+            f'<span>Preseason chance of meeting all three breakout criteria by the end of {upcoming}.</span></div></div>')
+        breakout_progress(history, selected, upcoming, forecast_start, version)
+    breakout_accuracy(version, history)
