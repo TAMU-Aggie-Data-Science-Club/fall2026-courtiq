@@ -175,7 +175,7 @@ button:is([kind^="secondary"],[kind^="primary"],[data-testid^="stBaseButton"],[d
     background-color:#1b2731 !important;}
 .stApp [data-testid="stMain"] label[data-baseweb="radio"]:has(input:checked) > div:first-child > div {
     background-color:#121b22 !important;}
-.stApp [data-testid="stSlider"] [data-testid="stSliderTickBarMin"], .stApp [data-testid="stSlider"] [data-testid="stSliderTickBarMax"] {color:#b9c2c8;}
+.stApp [data-testid="stSlider"] [data-testid="stSliderTickBar"] > span {color:#b9c2c8 !important;}
 .stApp [data-testid="stMain"] [data-testid="stCheckbox"] label span:first-child {border-color:#a7b1b8;}
 .stApp .st-key-team_use_spread label:has(> input[type="checkbox"]:not(:checked):not(:disabled)) > div:first-child {
     background-color:#62798a !important;}
