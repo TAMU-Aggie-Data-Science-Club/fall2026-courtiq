@@ -643,7 +643,7 @@ def scouting_page(seasons, teams, manifest):
     page_intro("Explore a player’s strengths and weaknesses relative to eligible NBA players.",
                ["Pick a season and search for a player", "Choose a scouting lens",
                 "Read the radar chart to compare the player with eligible peers"])
-    available = sorted(seasons.loc[seasons.season_start >= 2023, "season"].unique(), reverse=True)
+    available = sorted(seasons.loc[seasons.season_start >= 2015, "season"].unique(), reverse=True)
     if not available:
         st.info("No player seasons are available.")
         return
@@ -840,13 +840,30 @@ def impact_player_games(version):
     return pd.read_csv(APP / "player_games.csv.gz", usecols=columns, parse_dates=["date"])
 
 
+@st.cache_data(show_spinner=False)
+def impact_history(path, modified):
+    return pd.read_csv(path, parse_dates=["date"])
+
+
 def impact_trend(season, pid, tid, team_games, version, color):
     st.subheader("On/Off over time")
     st.write(
         "See how the team's on-court and bench margins changed as the season progressed. "
         "Each point uses the last 10 appearances with usable box scores, starting after five."
     )
-    player_games = impact_player_games(version)
+    if team_games.season.eq(season).any():
+        player_games = impact_player_games(version)
+    else:
+        player_log = APP / "impact_history_player_games.csv.gz"
+        team_log = APP / "impact_history_team_games.csv.gz"
+        if not player_log.exists() or not team_log.exists():
+            st.info("Game-by-game trend unavailable. This snapshot has season summaries only for this season.")
+            return
+        player_games = impact_history(player_log, player_log.stat().st_mtime_ns)
+        team_games = impact_history(team_log, team_log.stat().st_mtime_ns)
+        if not player_games.season.eq(season).any() or not team_games.season.eq(season).any():
+            st.info("Game-by-game trend unavailable. This snapshot has season summaries only for this season.")
+            return
     stint = player_games.loc[
         player_games.season.eq(season) & player_games.player_id.eq(pid) & player_games.team_id.eq(tid)
     ]
@@ -940,7 +957,7 @@ def impact_page(impacts, teams, manifest):
     page_intro("See how a team scored relative to its opponents with a player on the court and on the bench.",
                ["Pick a season, player, and team stint", "Compare on-court and bench scoring margins",
                 "Use the league scatterplot to compare qualifying stints"])
-    available = sorted(impacts.loc[impacts.season_start.ge(2023), "season"].unique(), reverse=True)
+    available = sorted(impacts.loc[impacts.season_start.ge(2015), "season"].unique(), reverse=True)
     if not available:
         st.info("No on/off seasons are available.")
         return
