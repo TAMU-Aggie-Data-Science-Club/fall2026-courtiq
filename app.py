@@ -18,6 +18,11 @@ h1,h2,h3{letter-spacing:-.035em}
 [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked){background:#324653;box-shadow:inset 3px 0 #ff9c60}
 
 [data-testid="stMetric"]{border:1px solid #8794a455;border-radius:12px;padding:12px 16px}
+@media(max-width:640px){
+.stMainBlockContainer{padding:3.25rem 1rem 2.5rem}
+h1{font-size:2rem !important}
+[data-testid="stMetric"]{padding:10px 12px}
+}
 </style>""", unsafe_allow_html=True)
 st.html(ui.SHARED_STYLE)
 st.sidebar.markdown('<div class="court-brand"><strong>CourtIQ</strong><small>NBA scouting &amp; forecasts</small></div>',unsafe_allow_html=True)

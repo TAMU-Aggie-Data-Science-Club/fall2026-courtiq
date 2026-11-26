@@ -54,13 +54,13 @@ def rolling_margins(player_games, team_games):
     return result.dropna(subset=["on_margin", "off_margin"], how="all")
 
 
-def trend_chart(trend, color):
+def trend_chart(trend, color, neutral="#637783"):
     import plotly.graph_objects as go
 
     fig = go.Figure()
     for label, margin, minutes, accent, dash in (
         ("On court", "on_margin", "on_minutes", color, "solid"),
-        ("On bench", "off_margin", "off_minutes", "#637783", "dash"),
+        ("On bench", "off_margin", "off_minutes", neutral, "dash"),
     ):
         fig.add_trace(go.Scatter(
             x=trend.date, y=trend[margin], name=label, mode="lines+markers",
@@ -76,18 +76,18 @@ def trend_chart(trend, color):
     fig.update_yaxes(tickformat=".1f", hoverformat=".1f")
     fig.update_layout(
         xaxis_title="Game date", yaxis_title="Team point margin per 48",
-        hovermode="x unified", height=325, margin=dict(l=45, r=15, t=12, b=50),
-        legend=dict(orientation="h"),
+        hovermode="x unified", height=325, margin=dict(l=45, r=15, t=36, b=50),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
     )
     return fig
 
 
-def margin_bars(row, color):
+def margin_bars(row, color, neutral="#637783"):
     import plotly.graph_objects as go
 
     values = [row.on_per48, row.off_per48]
     labels = ["On court", "On bench"]
-    colors = [color, "#637783"]
+    colors = [color, neutral]
     minutes = [row.minutes_on, row.minutes_off]
     valid = [i for i, value in enumerate(values) if pd.notna(value)]
     fig = go.Figure()
@@ -118,6 +118,7 @@ def scout_peers(frame, min_minutes, selected_id, selected_team, min_games=20):
     eligible = frame.loc[frame.games.ge(min_games) & frame.minutes_on.ge(min_minutes)]
     eligible = eligible.dropna(subset=["on_per48", "off_per48", "on_off_diff"]).copy()
     eligible["rank"] = eligible.on_off_diff.rank(method="min", ascending=False).astype(int)
+    eligible["tied"] = eligible.on_off_diff.duplicated(keep=False)
     eligible["selected"] = eligible.player_id.eq(selected_id) & eligible.team_id.eq(selected_team)
     return eligible.sort_values(["rank", "player_name", "team_id"])
 
