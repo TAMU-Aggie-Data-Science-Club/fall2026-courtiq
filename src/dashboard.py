@@ -28,9 +28,19 @@ COLORS = dict(zip("ATL BOS BKN CHA CHI CLE DAL DEN DET GSW HOU IND LAC LAL MEM M
     "#cc3448 #168458 #667788 #008994 #d23753 #a33954 #1675af #bd902d #d33753 #317aca #d43a50 #bf942c #c34455 #8055ad #6382b4 #b93955 #23855d #3675a2 #aa8049 #e37935 #168cb6 #247eb1 #3978bd #8959ac #c94745 #8153a5 #808890 #c33b51 #795daa #c94355".split()))
 
 
-def team_color(teams, tid):
+# Each team's second brand color, tuned to stay readable on light and dark pages. Used when two
+# teams' primary colors are too close to tell apart (Kings vs Lakers, Bulls vs Heat, ...).
+SECONDARY_COLORS = dict(zip("ATL BOS BKN CHA CHI CLE DAL DEN DET GSW HOU IND LAC LAL MEM MIA MIL MIN NOP NYK OKC ORL PHI PHX POR SAC SAN TOR UTA WAS".split(),
+    "#a8b42a #b9a06a #a7b0b8 #4b3f8f #3a4148 #b8902f #a3aeb8 #24508f #1f5bab #c99a2e #a3aeb8 #1f3f7a #1f5bab #c99a2e #3b4f73 #e08b2e #c9b48a #5f8a3a #1f3f6b #1f5bab #e06a3b #a3aeb8 #c33b51 #e06a2e #3a4148 #9ea8b0 #3a4148 #c2a868 #2f3338 #1f4f8f".split()))
+
+
+def team_code(teams, tid):
     code = teams.loc[teams.team_id.eq(tid), "team_code"]
-    return COLORS.get(code.iloc[0], "#db7335") if len(code) else "#db7335"
+    return code.iloc[0] if len(code) else None
+
+
+def team_color(teams, tid):
+    return COLORS.get(team_code(teams, tid), "#db7335")
 
 
 def dark():
@@ -68,7 +78,12 @@ SHARED_STYLE = """
 .ciq-stat b {display:block; font-size:.78rem; letter-spacing:.02em;}
 .ciq-stat strong {display:block; font-size:1.45rem; line-height:1.2;}
 .ciq-stat span {display:block; font-size:.78rem;}
-@media(max-width:640px) {.ciq-cards {grid-template-columns:1fr;}}
+@media(max-width:640px) {
+    .ciq-cards {grid-template-columns:1fr;}
+    .ciq-table {font-size:.82rem;}
+    .ciq-table th, .ciq-table td {padding:.45rem .5rem;}
+    .ciq-steps {font-size:.85rem;}
+}
 </style>
 """
 
@@ -261,6 +276,8 @@ def _oklab(hex_color, cvd=None):
         lin = np.array([[.152286, 1.052583, -.204868], [.114503, .786281, .099216], [-.003882, -.048116, 1.051998]]) @ lin
     elif cvd == "deutan":
         lin = np.array([[.367322, .860646, -.227968], [.280085, .672501, .047413], [-.011820, .042940, .968881]]) @ lin
+    elif cvd == "tritan":
+        lin = np.array([[1.255528, -.076749, -.178779], [-.078411, .930809, .147602], [.004733, .691367, .3039]]) @ lin
     lin = np.clip(lin, 0, 1)
     lms = np.array([[.4122214708, .5363325363, .0514459929], [.2119034982, .6806995451, .1073969566],
                     [.0883024619, .2817188376, .6299787005]]) @ lin
@@ -270,19 +287,37 @@ def _oklab(hex_color, cvd=None):
 
 
 def color_distance(first, second):
-    """Smallest OKLab distance (x100) across normal, protan and deutan vision."""
-    return min(100 * np.linalg.norm(_oklab(first, cvd) - _oklab(second, cvd)) for cvd in (None, "protan", "deutan"))
+    """Smallest OKLab distance (x100) across normal, protan, deutan and tritan vision."""
+    return min(100 * np.linalg.norm(_oklab(first, cvd) - _oklab(second, cvd))
+               for cvd in (None, "protan", "deutan", "tritan"))
 
 
 PAIR_FALLBACKS = ("#1f5bab", "#a8441a", "#4b5b66")
+
+
+def chart_neutral(color):
+    """Gray for the comparison series drawn beside a team color (bench line, 50th percentile). Team
+    colors are mid-brightness, so the gray differs in lightness to stay distinct with color blindness."""
+    if dark():
+        return "#b8c1c7"
+    return "#2f3a42" if color_distance(color, "#2f3a42") >= 12 else "#b8c1c7"
 
 
 def pair_colors(teams, home_id, away_id):
     """Team colors for a two-team view, swapping the away color for a contrasting one when the
     two would be hard to tell apart (similar team colors or red-green color vision)."""
     home, away = team_color(teams, home_id), team_color(teams, away_id)
-    if color_distance(home, away) < 12:
-        away = max(PAIR_FALLBACKS, key=lambda candidate: color_distance(home, candidate))
+    if color_distance(home, away) >= 12:
+        return home, away
+    # Stay on real team colors: swap one team to its secondary (whichever separates them more),
+    # then both, before falling back to generic contrast colors.
+    home_alt = SECONDARY_COLORS.get(team_code(teams, home_id), home)
+    away_alt = SECONDARY_COLORS.get(team_code(teams, away_id), away)
+    for options in (((home, away_alt), (home_alt, away)), ((home_alt, away_alt),)):
+        pair = max(options, key=lambda colors: color_distance(*colors))
+        if color_distance(*pair) >= 12:
+            return pair
+    away = max(PAIR_FALLBACKS, key=lambda candidate: color_distance(home, candidate))
     return home, away
 
 
@@ -349,7 +384,7 @@ def choose(frame,key,label="Player"):
         frame = frame.sort_values([order,"player_name"],ascending=[False,True])
     names=frame.drop_duplicates("player_id").set_index("player_id").player_name.to_dict()
     if not names: return None
-    return st.selectbox(label,list(names),format_func=names.get,key=key)
+    return st.selectbox(label,list(names),index=kept_index(key,list(names)),format_func=names.get,key=key)
 
 
 def sources_and_limitations(page):
@@ -454,6 +489,11 @@ SCOUT_STYLE = """
 @media(max-width:640px) {
     .scout-grid {grid-template-columns:1fr;}
     .scout-cards {grid-template-columns:repeat(2,minmax(0,1fr));}
+    .st-key-scout_lens [data-testid="stButtonGroup"] > div {gap:.35rem;}
+    .st-key-scout_lens [data-testid="stButtonGroup"] button {flex:1 1 calc(50% - .35rem); margin:0;
+        border-radius:.5rem !important; min-height:2.6rem;}
+    .st-key-scout_lens [data-testid="stButtonGroup"] button p {white-space:normal; overflow:visible;
+        text-overflow:clip; line-height:1.2;}
 }
 </style>
 """
@@ -470,7 +510,7 @@ def scouting_metric_cards(breakdown, player_row, min_games=20, show_crowns=True)
         if metric.qualified:
             placement = f"{scouting.percentile_label(percentile)} percentile"
             rank = metric["rank"]
-            detail = f"Rank {rank:g} of {metric.population:,}"
+            detail = f"Rank {scouting.rank_label(rank, metric.get('tied', False))} of {metric.population:,}"
             if show_crowns and rank == 1:
                 crown = ' <span class="scout-crown" title="Ranked first in the league" aria-label="Ranked first in the league">👑</span>'
             track = (
@@ -522,7 +562,7 @@ def scouting_sources():
                 f"""
 - **Season, teams, and position** — The page combines regular-season appearances across the teams listed under the player's name. The position on that line shows where the player started most often that season. An additional position appears if it accounts for at least two starts and 25% of recorded starts. The team filter helps find players.
 - **Who qualifies** — Players normally need 20 games and 15 minutes per game. The latest season, if still in progress, uses a 5-game minimum until the snapshot includes at least 20 games for every team. Early rankings can swing sharply and badges and crowns start once standard qualification resumes. Three-point percentage requires 50 three-point attempts, and free-throw percentage requires 50 free-throw attempts in every season.
-- **Rank** — Rank 1 is the highest value for most stats. Defensive Rating and Foul Avoidance rank lower raw values first. “Rank 12 of 230” means 230 players qualified for that stat. Ties share the average of their positions. 👑 marks rank 1 when standard rankings apply.
+- **Rank** — Rank 1 is the highest value for most stats. Defensive Rating and Foul Avoidance rank lower raw values first. “Rank 12 of 230” means 230 players qualified for that stat. Tied players share the higher position, shown as “T-12”. 👑 marks rank 1 when standard rankings apply.
 - **Percentile** — Places a player's value on a 0–100 scale within that stat's eligible group. A 90th percentile is near the top tenth. The page rounds percentile labels to whole numbers.
 - **Unranked** — The player missed a qualification cutoff or the stat was unavailable. Look under the stat for the reason.
                 """
@@ -635,6 +675,19 @@ def keep_scouting_lens_selected():
         st.session_state["scout_lens"] = st.session_state.get("last_scout_lens", "All-Around")
     else:
         st.session_state["last_scout_lens"] = lens
+def kept_index(key, options, default=0):
+    """Index of the widget's previous choice when it is still an option, so a filter change keeps it."""
+    current = st.session_state.get(key)
+    return options.index(current) if current in options else default
+
+
+def scouting_player_order(pool):
+    """Players ranked by PRA per game in their latest season; regular-rotation players first."""
+    latest = pool.sort_values("season_start").drop_duplicates("player_id", keep="last")
+    rotation = latest.games.ge(5) & latest.mpg.ge(15)
+    latest = latest.assign(rotation=rotation).sort_values(
+        ["rotation", "pra_pg", "minutes", "player_name"], ascending=[False, False, False, True])
+    return latest.set_index("player_id").player_name.to_dict()
 
 
 def scouting_page(seasons, teams, manifest):
@@ -643,46 +696,52 @@ def scouting_page(seasons, teams, manifest):
     page_intro("Explore a player’s strengths and weaknesses relative to eligible NBA players.",
                ["Pick a season and search for a player", "Choose a scouting lens",
                 "Read the radar chart to compare the player with eligible peers"])
-    available = sorted(seasons.loc[seasons.season_start >= 2023, "season"].unique(), reverse=True)
-    if not available:
+    recent = seasons[seasons.season_start.ge(2023)]
+    if recent.empty:
         st.info("No player seasons are available.")
         return
-
-    season_col, team_col, player_col = st.columns([1, 1.25, 1.75])
-    season = season_col.selectbox("Season", available, index=min(1, len(available) - 1), key="scout_season")
-    season_rows = seasons[seasons.season.eq(season)]
-    league = scouting.canonical(season_rows)
-    provisional = False
+    all_seasons = sorted(recent.season.unique(), reverse=True)
     completed_start = manifest.get("latest_completed_start")
-    if season == available[0] and completed_start is not None and int(season[:4]) > completed_start:
-        counts = scouting_team_game_counts(manifest["version"]).get(season, {})
-        provisional = any(counts.get(tid, 0) < 20 for tid in teams.team_id)
-    min_games = 5 if provisional else 20
     team_lookup = teams.set_index("team_id")
     team_names = team_lookup.team_name.to_dict()
-    stints = season_rows[season_rows.team_id.ne(0)]
-    team_ids = sorted(stints.team_id.unique(), key=lambda tid: team_names.get(tid, str(tid)))
+    all_stints = recent[recent.team_id.ne(0)]
+
+    team_col, player_col, season_col = st.columns([1.25, 1.75, 1])
+    all_team_ids = sorted(all_stints.team_id.unique(), key=lambda tid: team_names.get(tid, str(tid)))
     team_id = team_col.selectbox(
-        "Find by team", [0, *team_ids],
+        "Find by team", [0, *all_team_ids],
         format_func=lambda tid: "All teams" if tid == 0 else team_names.get(tid, f"Team {tid}"),
         key="scout_team",
     )
-    roster = league
+    pool = scouting.canonical(recent)
     if team_id:
-        roster = league[league.player_id.isin(stints.loc[stints.team_id.eq(team_id), "player_id"])]
-    roster = roster.sort_values("player_name").reset_index(drop=True)
-    qualified = roster[roster.games.ge(min_games) & roster.mpg.ge(15)]
-    leaders = qualified.points_pg.dropna()
-    default_player = int(leaders.idxmax()) if not leaders.empty else 0
-    with player_col:
-        players = roster.set_index("player_id").player_name.to_dict()
-        pid = st.selectbox("Search player", list(players), index=default_player,
-                           format_func=players.get, key="scout_player") if players else None
-    scouting_freshness(season, manifest)
-    st.caption("The team filter finds players who appeared for that team. Stats combine all teams played for, and ranks compare across the league in the selected season.")
-    if pid is None:
+        pool = pool[pool.player_id.isin(all_stints.loc[all_stints.team_id.eq(team_id), "player_id"])]
+    players = scouting_player_order(pool)
+    if not players:
         st.info("No players match this selection.")
         return
+    with player_col:
+        pid = st.selectbox("Search player", list(players), index=kept_index("scout_player", list(players)),
+                           format_func=players.get, key="scout_player",
+                           help="Sorted by points + rebounds + assists per game in each player's latest season.")
+    available = sorted(pool.loc[pool.player_id.eq(pid), "season"].unique(), reverse=True)
+    completed = [s for s in available if completed_start is None or int(s[:4]) <= completed_start]
+    default_season = available.index(completed[0]) if completed else 0
+    season = season_col.selectbox("Season", available, key="scout_season",
+                                  index=kept_index("scout_season", available, default_season))
+    season_rows = seasons[seasons.season.eq(season)]
+    league = scouting.canonical(season_rows)
+    provisional = False
+    if season == all_seasons[0] and completed_start is not None and int(season[:4]) > completed_start:
+        counts = scouting_team_game_counts(manifest["version"]).get(season, {})
+        provisional = any(counts.get(tid, 0) < 20 for tid in teams.team_id)
+    min_games = 5 if provisional else 20
+    stints = season_rows[season_rows.team_id.ne(0)]
+    team_ids = sorted(stints.team_id.unique(), key=lambda tid: team_names.get(tid, str(tid)))
+    scouting_freshness(season, manifest)
+    st.caption("The team filter finds players who appeared for that team since 2023-24. Seasons list only the "
+               "years the player appeared. Stats combine all teams played for, and ranks compare across the "
+               "league in the selected season.")
 
     row = league[league.player_id.eq(pid)].iloc[0]
     version = manifest["version"]
@@ -772,7 +831,8 @@ def scouting_page(seasons, teams, manifest):
     primary_stint = player_stints.nlargest(1, "minutes")
     color = team_color(teams, primary_stint.team_id.iloc[0]) if not primary_stint.empty else "#b54b1c"
     show_chart(
-        scouting.radar(breakdown, color=color, show_crowns=not provisional, player_name=row.player_name),
+        scouting.radar(breakdown, color=color, show_crowns=not provisional, player_name=row.player_name,
+                       neutral=chart_neutral(color)),
         use_container_width=True, theme=None,
     )
     st.markdown(f"**{report_title}**")
@@ -854,7 +914,7 @@ def impact_trend(season, pid, tid, team_games, version, color):
     if trend.empty:
         st.info("This team stint needs at least five appearances with usable box scores to show a trend.")
         return
-    show_chart(impact.trend_chart(trend, color), use_container_width=True)
+    show_chart(impact.trend_chart(trend, color, chart_neutral(color)), use_container_width=True)
     st.caption("Each line uses the total point margin and minutes in that stretch. Games with more minutes carry more weight.")
 
 
@@ -897,8 +957,8 @@ def impact_league_comparison(season_rows, teams, pid, tid, min_games=20):
     if selected.empty:
         st.caption("The selected team stint is outside this comparison group.")
     else:
-        rank = selected.iloc[0]["rank"]
-        st.write(f"**Selected team stint: #{rank} of {len(peers):,}**")
+        stint = selected.iloc[0]
+        st.write(f"**Selected team stint: {'T-' if stint.tied else '#'}{stint['rank']} of {len(peers):,}**")
     st.write(
         "**Read the scatterplot:** Each dot is one player's team stint. Farther right means a higher "
         "bench margin. Farther up means a higher on-court margin. "
@@ -920,7 +980,7 @@ def impact_league_comparison(season_rows, teams, pid, tid, min_games=20):
     top = peers.head(8)
     leaders = pd.concat([top, selected]).drop_duplicates(["player_id", "team_id"]).reset_index(drop=True)
     display = pd.DataFrame({
-        "Rank": leaders["rank"].map(lambda value: f"#{value}"),
+        "Rank": [f"T-{rank}" if tied else f"#{rank}" for rank, tied in zip(leaders["rank"], leaders.tied)],
         "Player · team": leaders.stint_label.where(~leaders.selected, "★ " + leaders.stint_label),
         "On/off per 48 ▼": leaders.on_off_diff.map(impact.signed_margin),
         "On court per 48": leaders.on_per48.map(impact.signed_margin),
@@ -1001,11 +1061,11 @@ def impact_page(impacts, teams, manifest):
     games_used = f"{row.valid_on_games:,.0f} of {row.games:,.0f} played games used"
     impact_cards([
         ("On court", impact.signed_margin(row.on_per48), "Points per 48", on_minutes, color),
-        ("On bench", impact.signed_margin(row.off_per48), "Points per 48", off_minutes, "#637783"),
+        ("On bench", impact.signed_margin(row.off_per48), "Points per 48", off_minutes, chart_neutral(color)),
         ("On/Off difference", impact.signed_margin(row.on_off_diff), "Points per 48", games_used, "#b54b1c"),
     ])
     if pd.notna(row.on_per48) or pd.notna(row.off_per48):
-        show_chart(impact.margin_bars(row, color), use_container_width=True)
+        show_chart(impact.margin_bars(row, color, chart_neutral(color)), use_container_width=True)
     st.write(impact.court_summary(row))
     if row.reliability == "Low":
         st.info("Sample size: Limited. A short stretch on either side can make this comparison swing.")
@@ -1465,20 +1525,59 @@ def team_market_record(version):
     return record
 
 
+def _metric_rows(data, label=""):
+    """Flatten nested JSON into (metric, value) rows; lists of records are labeled by their first field."""
+    if isinstance(data, dict):
+        for key, value in data.items():
+            yield from _metric_rows(value, f"{label} {key}".strip())
+    elif isinstance(data, list) and data and all(isinstance(item, dict) for item in data):
+        for item in data:
+            first_key, first_value = next(iter(item.items()))
+            rest = {k: v for k, v in item.items() if k != first_key}
+            yield from _metric_rows(rest, f"{label} {first_key} {first_value}".strip())
+    else:
+        yield {"metric": label.replace("_", " "), "value": round(data, 4) if isinstance(data, float) else data}
+
+
+def evaluation_csv(data):
+    """CSV text for a downloaded evaluation: a table for lists of records, metric/value rows otherwise."""
+    if isinstance(data, list) and all(isinstance(item, dict) for item in data):
+        frame = pd.DataFrame(data)
+    else:
+        return pd.DataFrame(list(_metric_rows(data)), columns=["metric", "value"]).to_csv(index=False)
+    return frame.to_csv(index=False, float_format="%.4f")
+
+
+def evaluation_results_csv(evaluation, prefix):
+    """One row per model and period for each target that starts with the prefix."""
+    rows = []
+    for target, entry in evaluation.items():
+        if not target.startswith(prefix):
+            continue
+        for result in entry.get("results", []):
+            rows.append({"target": target.removeprefix(f"{prefix}_"), "model": result.get("model"),
+                         "period": result.get("period"), "selected": result.get("model") == entry.get("selected"),
+                         **result, "training_cutoff": entry.get("training_cutoff")})
+    frame = pd.DataFrame(rows)
+    if "training_cutoff" in frame:
+        frame["training_cutoff"] = frame.pop("training_cutoff")
+    return frame.to_csv(index=False, float_format="%.4f")
+
+
 def evaluation_downloads(prefix):
     path = APP / "evaluation.json"
     with st.popover("Download the full evaluation"):
         baseline = APP / "baselines.json"
         if baseline.exists():
-            st.download_button("Baseline comparison", json.dumps(json.loads(baseline.read_text()).get(prefix), indent=2),
-                               file_name=f"{prefix}_baselines.json")
+            st.download_button("Baseline comparison", evaluation_csv(json.loads(baseline.read_text()).get(prefix)),
+                               file_name=f"{prefix}_baselines.csv", mime="text/csv")
         if path.exists():
-            st.download_button("Model evaluation", json.dumps(
-                {k: v for k, v in json.loads(path.read_text()).items() if k.startswith(prefix)}, indent=2),
-                file_name=f"{prefix}_evaluation.json")
+            st.download_button("Model evaluation", evaluation_results_csv(json.loads(path.read_text()), prefix),
+                               file_name=f"{prefix}_evaluation.csv", mime="text/csv")
         market = APP / "market_evaluation.json"
         if prefix == "team" and market.exists():
-            st.download_button("Historical market comparison", market.read_text(), file_name=market.name)
+            st.download_button("Historical market comparison", evaluation_csv(json.loads(market.read_text())),
+                               file_name="market_evaluation.csv", mime="text/csv")
 
 
 def team_accuracy(version):
