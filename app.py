@@ -83,6 +83,8 @@ st.sidebar.toggle(theme_label, key="dark_mode", on_change=update_theme_url,
                   help="Switch between dark and light colors for the page, cards and charts.")
 if ui.dark():
     st.html(ui.DARK_STYLE)
+else:
+    st.html(ui.LIGHT_STYLE)
 manifest_path=APP/"manifest.json"
 if not manifest_path.exists():
     st.info("Data is not prepared yet. Run python scripts/build_dataset.py, then python scripts/train_models.py.")

@@ -87,6 +87,16 @@ SHARED_STYLE = """
 </style>
 """
 
+LIGHT_STYLE = """
+<style>
+/* Light mode: Streamlit draws captions at 60% opacity (about 4:1 contrast on the cream page).
+   Use near-black text at full opacity so notes stay readable while staying a step below body text. */
+.stApp [data-testid="stMain"] [data-testid="stCaptionContainer"] {opacity:1; color:#2b3640;}
+.stApp [data-testid="stMain"] [data-testid="stCaptionContainer"] :is(p, strong, span, a) {color:#2b3640;}
+.stApp .st-key-team_spread [data-testid="stWidgetLabel"] p {color:#202c36b8;}
+</style>
+"""
+
 DARK_STYLE = """
 <style>
 .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], [data-testid="stHeader"],
