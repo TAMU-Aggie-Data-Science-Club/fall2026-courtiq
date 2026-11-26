@@ -158,7 +158,8 @@ def rankings(frame, season, lens="All-Around", min_games=20, min_mpg=15, directi
         higher_better=(directions or {}).get(metric, metric not in ("drtg", "fouls_per36"))
         pieces.append(pd.DataFrame({"player_id":f.player_id,"season":season,"metric":metric,
             "label":label,"value":f[metric],"percentile":values.rank(method="average",pct=True,ascending=higher_better)*100,
-            "rank":values.rank(method="average",ascending=not higher_better),"population":int(eligible.sum()),
+            "rank":values.rank(method="min",ascending=not higher_better),
+            "tied":values.notna()&values.duplicated(keep=False),"population":int(eligible.sum()),
             "qualified":eligible}))
     return pd.concat(pieces,ignore_index=True)
 
@@ -244,7 +245,14 @@ def starting_position(row):
     return labels, f"Recorded starting positions ({total} starts): {counts}"
 
 
-def radar(breakdown, color="#b54b1c", *, show_crowns=True, player_name="Selected player"):
+def rank_label(rank, tied=False):
+    """Standard competition rank: tied players share the best position, shown as T-107."""
+    if pd.isna(rank):
+        return "—"
+    return f"T-{rank:.0f}" if tied else f"{rank:.0f}"
+
+
+def radar(breakdown, color="#b54b1c", *, show_crowns=True, player_name="Selected player", neutral="#697681"):
     import plotly.graph_objects as go
     b=breakdown.reset_index(drop=True)
     if b.empty:
@@ -261,11 +269,11 @@ def radar(breakdown, color="#b54b1c", *, show_crowns=True, player_name="Selected
     complete=all(pd.notna(v) for v in values)
     fig=go.Figure()
     fig.add_trace(go.Scatterpolar(r=[50]*(len(labels)+1),theta=labels+[labels[0]],
-        name="50th percentile",line=dict(color="#697681",dash="dot"),hoverinfo="skip"))
+        name="50th percentile",line=dict(color=neutral,dash="dot"),hoverinfo="skip"))
     theta=labels+[labels[0]]
     r=values+[values[0]]
     custom = [[METRIC_DETAILS[row.metric][0], display_value(row.metric, row.value),
-               f"{row['rank']:g}", row.population] for _, row in b.iterrows()]
+               rank_label(row["rank"], row.get("tied", False)), row.population] for _, row in b.iterrows()]
     fig.add_trace(go.Scatterpolar(r=r,theta=theta,fill="toself" if complete else "none",
         connectgaps=False,mode="lines+markers",name=player_name,customdata=custom+[custom[0]],
         line=dict(color=color,width=3),fillcolor=f"rgba({red},{green},{blue},.16)",

@@ -172,10 +172,10 @@ class RealTests(unittest.TestCase):
         self.assertTrue(any("Needs 20 games and 15 minutes per game" in item.proto.body
                             for item in at.get("html")))
 
-        at.selectbox(key="scout_season").set_value("2026-27").run()
         early = seasons.query("season == '2026-27' and team_id == 0 and games >= 5 and mpg >= 15")
         leading_scorer = early.loc[early.points_pg.idxmax()]
         at.selectbox(key="scout_player").set_value(int(leading_scorer.player_id)).run()
+        at.selectbox(key="scout_season").set_value("2026-27").run()
         at.button_group(key="scout_lens").set_value(["All-Around"]).run()
         labels = radar()["layout"]["polar"]["angularaxis"]["ticktext"]
         self.assertTrue(any("Points per game<br><b>100th pctile" in label for label in labels))
@@ -565,6 +565,78 @@ class FeedbackTests(unittest.TestCase):
         self.assertTrue(line.iloc[12:17].isna().all())       # new season starts over
         self.assertAlmostEqual(line.iloc[17], 50.0)
         self.assertAlmostEqual(line.iloc[23], 7.0)           # other player kept separate
+
+    def test_scouting_season_switch_keeps_player_and_lists_only_his_seasons(self):
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file("app.py", default_timeout=40).run()
+        seasons = pd.read_csv(APP / "player_season.csv.gz", low_memory=False)
+        recent = seasons.query("season_start >= 2023 and team_id == 0")
+        options = at.selectbox(key="scout_player").options
+        latest = recent.sort_values("season_start").drop_duplicates("player_id", keep="last")
+        latest = latest[latest.games.ge(5) & latest.mpg.ge(15)].nlargest(5, "pra_pg")
+        self.assertEqual(options[:5], latest.player_name.tolist())
+
+        veteran = recent.groupby("player_id").season.nunique().idxmax()
+        at.selectbox(key="scout_player").set_value(int(veteran)).run()
+        for season in at.selectbox(key="scout_season").options:
+            at.selectbox(key="scout_season").set_value(season).run()
+            self.assertFalse(at.exception)
+            self.assertEqual(at.selectbox(key="scout_player").value, int(veteran))
+
+        flagg = int(recent.loc[recent.player_name.eq("Cooper Flagg"), "player_id"].iloc[0])
+        at.selectbox(key="scout_player").set_value(flagg).run()
+        expected = sorted(recent.loc[recent.player_id.eq(flagg), "season"], reverse=True)
+        self.assertEqual(at.selectbox(key="scout_season").options, expected)
+
+    def test_evaluation_downloads_are_csv(self):
+        from io import StringIO
+        from src.dashboard import evaluation_csv, evaluation_results_csv
+
+        baselines = json.loads((APP / "baselines.json").read_text())
+        evaluation = json.loads((APP / "evaluation.json").read_text())
+        for prefix in ("team", "player", "breakout"):
+            self.assertFalse(pd.read_csv(StringIO(evaluation_csv(baselines[prefix]))).empty)
+            results = pd.read_csv(StringIO(evaluation_results_csv(evaluation, prefix)))
+            self.assertEqual(list(results.columns[:4]), ["target", "model", "period", "selected"])
+            self.assertTrue(results.selected.any())
+
+    def test_team_colors_stay_distinct_for_color_blind_viewers(self):
+        import itertools
+        from src.dashboard import COLORS, SECONDARY_COLORS, chart_neutral, color_distance, pair_colors
+
+        teams = pd.read_csv(APP / "teams.csv.gz")
+        ids = teams.set_index("team_code").team_id
+        for home, away in itertools.permutations(ids.index, 2):
+            colors = pair_colors(teams, ids[home], ids[away])
+            self.assertIn(colors[0], (COLORS[home], SECONDARY_COLORS[home]))
+            self.assertIn(colors[1], (COLORS[away], SECONDARY_COLORS[away]))
+            self.assertGreaterEqual(color_distance(*colors), 12, (home, away))
+        for code, color in COLORS.items():
+            self.assertGreaterEqual(color_distance(color, chart_neutral(color)), 12, code)
+
+    def test_tied_ranks_use_t_labels(self):
+        from src.features import scouting
+
+        self.assertEqual(scouting.rank_label(107, True), "T-107")
+        self.assertEqual(scouting.rank_label(4, False), "4")
+        seasons = pd.read_csv(APP / "player_season.csv.gz", low_memory=False)
+        league = scouting.canonical(seasons[seasons.season.eq("2025-26")])
+        ranks = scouting.rankings(league, "2025-26")
+        self.assertTrue(ranks["rank"].dropna().eq(ranks["rank"].dropna().round()).all())
+        self.assertTrue(ranks.tied.any())
+
+    def test_pair_colors_keep_team_colors(self):
+        from src.dashboard import COLORS, PAIR_FALLBACKS, SECONDARY_COLORS, pair_colors
+
+        teams = pd.read_csv(APP / "teams.csv.gz")
+        ids = teams.set_index("team_code").team_id
+        for home in ("GSW", "LAL", "PHX", "UTA"):
+            for first, second in ((home, "SAC"), ("SAC", home)):
+                colors = pair_colors(teams, ids[first], ids[second])
+                kings = colors[(first, second).index("SAC")]
+                self.assertIn(kings, (COLORS["SAC"], SECONDARY_COLORS["SAC"]))
+                self.assertNotIn(kings, PAIR_FALLBACKS)
 
     def test_pair_colors_separate_similar_teams(self):
         from src.dashboard import color_distance, pair_colors
