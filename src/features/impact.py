@@ -9,7 +9,7 @@ def signed_margin(value, digits=1):
     return f"{rounded:+.{digits}f}" if rounded else f"{0:.{digits}f}"
 
 
-def court_summary(row):
+def court_summary(row, team_name):
     if pd.isna(row.on_per48) or pd.isna(row.off_per48):
         return "A comparison needs usable scoring and playing-time data for both on-court and bench minutes."
 
@@ -20,8 +20,9 @@ def court_summary(row):
         verb = "outscored opponents" if margin > 0 else "was outscored"
         return f"{verb} by {abs(margin):.1f} points per 48 minutes {situation}"
 
-    return (f"In the games covered, the team {result(row.on_per48, 'with the player on the floor')} "
-            f"and {result(row.off_per48, 'with the player on the bench')}.")
+    on_court = result(row.on_per48, f"with {row.player_name} on the floor")
+    on_bench = result(row.off_per48, f"with {row.player_name} on the bench")
+    return f"In the games covered, the {team_name} {on_court} and {on_bench}."
 
 
 TREND_WINDOW = 10

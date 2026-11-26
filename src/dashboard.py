@@ -1109,7 +1109,7 @@ def impact_page(impacts, teams, manifest):
     ])
     if pd.notna(row.on_per48) or pd.notna(row.off_per48):
         show_chart(impact.margin_bars(row, color, chart_neutral(color)), use_container_width=True)
-    st.write(impact.court_summary(row))
+    st.write(impact.court_summary(row, team_name(tid)))
     if row.reliability == "Low":
         st.info("Sample size: Limited. A short stretch on either side can make this comparison swing.")
     elif pd.notna(row.reliability):
