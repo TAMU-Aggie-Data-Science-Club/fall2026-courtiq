@@ -443,6 +443,7 @@ class RealTests(unittest.TestCase):
         for expected in stints.itertuples():
             app.selectbox(key="impact_team_filter").set_value(int(expected.team_id)).run()
             app.selectbox(key="impact_player").set_value(player_id).run()
+            app.selectbox(key="impact_season").set_value(season).run()
             self.assertFalse(app.exception)
             identity = next(item.proto.body for item in app.get("html") if 'class="impact-identity"' in item.proto.body)
             self.assertIn(teams[expected.team_id], identity)
@@ -467,6 +468,7 @@ class RealTests(unittest.TestCase):
         no_missed = complete.loc[complete.games_missed.eq(0) & complete.valid_on_games.ge(10)].iloc[0]
         app.selectbox(key="impact_team_filter").set_value(int(no_missed.team_id)).run()
         app.selectbox(key="impact_player").set_value(int(no_missed.player_id)).run()
+        app.selectbox(key="impact_season").set_value(season).run()
         self.assertFalse(app.exception)
         headings = [item.value for item in app.subheader]
         self.assertIn("On/Off over time", headings)
@@ -485,11 +487,14 @@ class RealTests(unittest.TestCase):
         small_sample = complete.loc[complete.reliability.eq("Low")].iloc[0]
         app.selectbox(key="impact_team_filter").set_value(int(small_sample.team_id)).run()
         app.selectbox(key="impact_player").set_value(int(small_sample.player_id)).run()
+        app.selectbox(key="impact_season").set_value(season).run()
         self.assertFalse(app.exception)
         self.assertTrue(any("Sample size: Limited" in item.value for item in app.info))
 
-        app.selectbox(key="impact_season").set_value("2026-27").run()
         app.selectbox(key="impact_team_filter").set_value(0).run()
+        current = pd.read_csv(APP / "on_off.csv.gz").query("season == '2026-27'").iloc[0]
+        app.selectbox(key="impact_player").set_value(int(current.player_id)).run()
+        app.selectbox(key="impact_season").set_value("2026-27").run()
         app.slider(key="impact_peer_minutes").set_value(0).run()
         self.assertFalse(app.exception)
         self.assertTrue(any("needs 5 games played" in item.value for item in app.caption))
@@ -502,6 +507,30 @@ class RealTests(unittest.TestCase):
         self.assertFalse(app.exception)
         self.assertTrue(any("reaches this minutes cutoff" in item.value for item in app.info))
         self.assertFalse(any('class="ciq-table"' in item.proto.body for item in app.get("html")))
+
+    def test_impact_picker_limits_seasons_and_keeps_valid_choices(self):
+        from streamlit.testing.v1 import AppTest
+
+        app = AppTest.from_file("app.py", default_timeout=40)
+        app.query_params["page"] = "on-off-impact"
+        app.run()
+        rows = pd.read_csv(APP / "on_off.csv.gz").query("season_start >= 2023")
+        by_player = rows.groupby("player_id").season.agg(lambda values: sorted(set(values), reverse=True))
+        veteran = int(by_player[by_player.map(len).eq(rows.season.nunique())].index[0])
+        limited = int(by_player[by_player.map(len).eq(1)].index[0])
+
+        app.selectbox(key="impact_player").set_value(veteran).run()
+        other_season = next(season for season in by_player[veteran] if season not in by_player[limited])
+        app.selectbox(key="impact_season").set_value(other_season).run()
+        self.assertEqual(app.selectbox(key="impact_player").value, veteran)
+        app.selectbox(key="impact_player").set_value(limited).run()
+        self.assertEqual(app.selectbox(key="impact_season").options, by_player[limited])
+        self.assertEqual(app.selectbox(key="impact_season").value, by_player[limited][0])
+        tid = int(rows.loc[rows.player_id.eq(limited), "team_id"].iloc[0])
+        app.selectbox(key="impact_team_filter").set_value(tid).run()
+        self.assertEqual(app.selectbox(key="impact_player").value, limited)
+        self.assertEqual(app.selectbox(key="impact_season").value, by_player[limited][0])
+        self.assertFalse(app.exception)
 
     def test_impact_trend_weights_by_minutes_and_rolls_off_old_games(self):
         from src.features.impact import rolling_margins

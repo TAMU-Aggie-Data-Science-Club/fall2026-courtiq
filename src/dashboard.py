@@ -998,33 +998,53 @@ def impact_page(impacts, teams, manifest):
     st.html(IMPACT_STYLE)
     st.header("On/Off Impact")
     page_intro("See how a team scored relative to its opponents with a player on the court and on the bench.",
-               ["Pick a season, player, and team stint", "Compare on-court and bench scoring margins",
+               ["Find a player, then pick a season and team stint", "Compare on-court and bench scoring margins",
                 "Use the league scatterplot to compare qualifying stints"])
-    available = sorted(impacts.loc[impacts.season_start.ge(2023), "season"].unique(), reverse=True)
-    if not available:
+    recent = impacts.loc[impacts.season_start.ge(2023)]
+    if recent.empty:
         st.info("No on/off seasons are available.")
         return
 
-    season_col, team_col, player_col = st.columns([1, 1.25, 1.75])
-    season = season_col.selectbox("Season", available, index=min(1, len(available) - 1), key="impact_season")
-    season_rows = impacts.loc[impacts.season.eq(season)]
+    version = manifest["version"]
+    completed_start = manifest.get("latest_completed_start")
     lookup = teams.set_index("team_id").team_name.to_dict()
 
     def team_name(tid):
         return lookup.get(tid, f"Team {tid}")
 
-    team_ids = sorted(season_rows.team_id.unique(), key=team_name)
+    team_col, player_col, season_col = st.columns([1.25, 1.75, 1])
+    team_ids = sorted(recent.team_id.unique(), key=team_name)
     team_filter = team_col.selectbox(
         "Find by team", [0, *team_ids], key="impact_team_filter",
         format_func=lambda tid: team_name(tid) if tid else "All teams",
     )
-    roster = season_rows if team_filter == 0 else season_rows.loc[season_rows.team_id.eq(team_filter)]
-    with player_col:
-        pid = choose(roster, "impact_player", "Search player")
-    if pid is None:
-        st.info("No players match the selected season and team.")
-        return
+    roster = recent
+    if team_filter:
+        player_ids = recent.loc[recent.team_id.eq(team_filter), "player_id"]
+        roster = recent.loc[recent.player_id.isin(player_ids)]
 
+    player_seasons = roster[["player_id", "season_start"]].drop_duplicates()
+    season_stats = table("player_season", version).merge(player_seasons, on=["player_id", "season_start"])
+    players = scouting_player_order(scouting.canonical(season_stats))
+    # Keep players searchable even when the season stats snapshot lacks a matching row.
+    for player in roster.sort_values("player_name").drop_duplicates("player_id").itertuples():
+        players.setdefault(player.player_id, player.player_name)
+    options = list(players)
+    pid = player_col.selectbox(
+        "Search player", options, index=kept_index("impact_player", options),
+        format_func=players.get, key="impact_player",
+        help="Sorted by points + rebounds + assists per game in each player's latest season with available stats.",
+    )
+    available = sorted(roster.loc[roster.player_id.eq(pid), "season"].unique(), reverse=True)
+    completed = [s for s in available if completed_start is None or int(s[:4]) <= completed_start]
+    default_season = available.index(completed[0]) if completed else 0
+    season = season_col.selectbox(
+        "Season", available, key="impact_season", index=kept_index("impact_season", available, default_season),
+    )
+    st.caption("The team filter finds players who appeared for that team since 2023–24. "
+               "Choose a team stint to see that team's results for the selected season.")
+
+    season_rows = recent.loc[recent.season.eq(season)]
     player_rows = season_rows.loc[season_rows.player_id.eq(pid)].sort_values("minutes_on", ascending=False)
     stints = player_rows.team_id.tolist()
     tid = stints[0]
@@ -1037,11 +1057,9 @@ def impact_page(impacts, teams, manifest):
         )
     row = player_rows.loc[player_rows.team_id.eq(tid)].iloc[0]
     color = team_color(teams, tid)
-    version = manifest["version"]
     team_games = table("team_games", version)
     min_games = 20
-    completed_start = manifest.get("latest_completed_start")
-    if season == available[0] and completed_start is not None and int(season[:4]) > completed_start:
+    if season == recent.season.max() and completed_start is not None and int(season[:4]) > completed_start:
         counts = team_games.loc[team_games.season.eq(season)].groupby("team_id").game_id.nunique()
         if counts.reindex(teams.team_id, fill_value=0).lt(20).any():
             min_games = 5
