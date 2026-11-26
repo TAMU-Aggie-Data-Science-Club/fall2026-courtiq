@@ -522,6 +522,12 @@ class RealTests(unittest.TestCase):
         app.query_params["page"] = "on-off-impact"
         app.run()
         rows = pd.read_csv(APP / "on_off.csv.gz").query("season_start >= 2015")
+        completed_start = json.loads((APP / "manifest.json").read_text())["latest_completed_start"]
+        completed = rows.loc[rows.season_start.eq(completed_start)].sort_values(
+            ["minutes_on", "player_name"], ascending=[False, True],
+        )
+        expected_order = completed.drop_duplicates("player_id").player_name.tolist()
+        self.assertEqual(app.selectbox(key="impact_player").options[:len(expected_order)], expected_order)
         by_player = rows.groupby("player_id").season.agg(lambda values: sorted(set(values), reverse=True))
         veteran = int(by_player[by_player.map(len).eq(rows.season.nunique())].index[0])
         limited = int(by_player[by_player.map(len).eq(1)].index[0])
@@ -531,6 +537,11 @@ class RealTests(unittest.TestCase):
         other_season = next(season for season in reversed(by_player[veteran]) if season not in by_player[limited])
         app.selectbox(key="impact_season").set_value(other_season).run()
         self.assertEqual(app.selectbox(key="impact_player").value, veteran)
+        stint = rows.loc[rows.player_id.eq(veteran) & rows.season.eq(other_season)].nlargest(1, "minutes_on").iloc[0]
+        history = pd.read_csv(APP / "impact_history_team_games.csv.gz", parse_dates=["date"])
+        latest = history.loc[history.season.eq(other_season) & history.team_id.eq(stint.team_id), "date"].max()
+        expected_caption = f"team games included through {latest:%b} {latest.day}, {latest.year}"
+        self.assertTrue(any(expected_caption in item.value for item in app.caption))
         app.selectbox(key="impact_player").set_value(limited).run()
         self.assertEqual(app.selectbox(key="impact_season").options, by_player[limited])
         self.assertEqual(app.selectbox(key="impact_season").value, by_player[limited][0])
@@ -641,10 +652,16 @@ class FeedbackTests(unittest.TestCase):
         at.selectbox(key="scout_player").set_value(int(veteran)).run()
         expected = sorted(recent.loc[recent.player_id.eq(veteran), "season"], reverse=True)
         self.assertEqual(at.selectbox(key="scout_season").options, expected)
+        history = pd.read_csv(APP / "impact_history_player_games.csv.gz", parse_dates=["date"])
+        historical_dates = history.loc[history.played].groupby("season").date.max()
         for season in at.selectbox(key="scout_season").options:
             at.selectbox(key="scout_season").set_value(season).run()
             self.assertFalse(at.exception)
             self.assertEqual(at.selectbox(key="scout_player").value, int(veteran))
+            if season in historical_dates:
+                latest = historical_dates[season]
+                expected_caption = f"Games included through {latest:%b} {latest.day}, {latest.year}"
+                self.assertTrue(any(expected_caption in item.value for item in at.caption))
 
         flagg = int(recent.loc[recent.player_name.eq("Cooper Flagg"), "player_id"].iloc[0])
         at.selectbox(key="scout_player").set_value(flagg).run()

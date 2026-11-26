@@ -436,6 +436,10 @@ def scouting_team_game_counts(version):
 
 def scouting_freshness(season, manifest):
     latest = scouting_game_dates(manifest["version"]).get(season)
+    if pd.isna(latest):
+        history = historical_game_log("player_games")
+        if history is not None:
+            latest = history.loc[history.season.eq(season) & history.played, "date"].max()
     built = pd.to_datetime(manifest.get("built_at"), utc=True, errors="coerce")
     labels = []
     if pd.notna(latest):
@@ -694,7 +698,7 @@ def scouting_page(seasons, teams, manifest):
     st.html(SCOUT_STYLE)
     st.header("Player Scouting Lab")
     page_intro("Explore a player’s strengths and weaknesses relative to eligible NBA players.",
-               ["Pick a season and search for a player", "Choose a scouting lens",
+               ["Search for a player, then pick a season", "Choose a scouting lens",
                 "Read the radar chart to compare the player with eligible peers"])
     recent = seasons[seasons.season_start.ge(2015)]
     if recent.empty:
@@ -712,6 +716,7 @@ def scouting_page(seasons, teams, manifest):
         "Find by team", [0, *all_team_ids],
         format_func=lambda tid: "All teams" if tid == 0 else team_names.get(tid, f"Team {tid}"),
         key="scout_team",
+        help="Find players who appeared for this team in any season since 2015–16.",
     )
     pool = scouting.canonical(recent)
     if team_id:
@@ -905,6 +910,13 @@ def impact_history(path, modified):
     return pd.read_csv(path, parse_dates=["date"])
 
 
+def historical_game_log(name):
+    path = APP / f"impact_history_{name}.csv.gz"
+    if path.exists():
+        return impact_history(path, path.stat().st_mtime_ns)
+    return None
+
+
 def impact_trend(season, pid, tid, team_games, version, color):
     st.subheader("On/Off over time")
     st.write(
@@ -914,14 +926,10 @@ def impact_trend(season, pid, tid, team_games, version, color):
     if team_games.season.eq(season).any():
         player_games = impact_player_games(version)
     else:
-        player_log = APP / "impact_history_player_games.csv.gz"
-        team_log = APP / "impact_history_team_games.csv.gz"
-        if not player_log.exists() or not team_log.exists():
-            st.info("Game-by-game trend unavailable. This snapshot has season summaries only for this season.")
-            return
-        player_games = impact_history(player_log, player_log.stat().st_mtime_ns)
-        team_games = impact_history(team_log, team_log.stat().st_mtime_ns)
-        if not player_games.season.eq(season).any() or not team_games.season.eq(season).any():
+        player_games = historical_game_log("player_games")
+        team_games = historical_game_log("team_games")
+        if (player_games is None or team_games is None
+                or not player_games.season.eq(season).any() or not team_games.season.eq(season).any()):
             st.info("Game-by-game trend unavailable. This snapshot has season summaries only for this season.")
             return
     stint = player_games.loc[
@@ -939,7 +947,6 @@ def impact_league_comparison(season_rows, teams, pid, tid, min_games=20):
     from html import escape
 
     st.subheader("Compare with other players")
-    st.caption("Each ranking is for one player and team stint. The filter applies to the league comparison below.")
     minimum = st.slider("Minimum on-court minutes", 0, 2500, 500, 100, key="impact_peer_minutes")
     st.caption(
         f"To appear in the scatterplot and table, a player needs {min_games} games played for that team, "
@@ -970,7 +977,6 @@ def impact_league_comparison(season_rows, teams, pid, tid, min_games=20):
     numbers = dict(zip(player_stints.team_id, range(1, len(player_stints) + 1)))
     peers["stint_number"] = peers.team_id.map(numbers).where(peers.player_id.eq(pid)).astype("Int64")
     selected = peers.loc[peers.selected]
-    st.caption(f"{len(peers):,} qualifying team stints across the league")
     if selected.empty:
         st.caption("The selected team stint is outside this comparison group.")
     else:
@@ -1034,25 +1040,23 @@ def impact_page(impacts, teams, manifest):
     team_filter = team_col.selectbox(
         "Find by team", [0, *team_ids], key="impact_team_filter",
         format_func=lambda tid: team_name(tid) if tid else "All teams",
+        help="Find players who appeared for this team in any season since 2015–16.",
     )
-    roster = recent
-    if team_filter:
-        player_ids = recent.loc[recent.team_id.eq(team_filter), "player_id"]
-        roster = recent.loc[recent.player_id.isin(player_ids)]
-
-    player_seasons = roster[["player_id", "season_start"]].drop_duplicates()
-    season_stats = table("player_season", version).merge(player_seasons, on=["player_id", "season_start"])
-    players = scouting_player_order(scouting.canonical(season_stats))
-    # Keep players searchable even when the season stats snapshot lacks a matching row.
-    for player in roster.sort_values("player_name").drop_duplicates("player_id").itertuples():
-        players.setdefault(player.player_id, player.player_name)
+    stints_for_search = recent.loc[recent.team_id.eq(team_filter)] if team_filter else recent
+    ordered = stints_for_search.assign(completed_season=stints_for_search.season_start.eq(completed_start))
+    ordered = ordered.sort_values(
+        ["completed_season", "season_start", "minutes_on", "player_name"],
+        ascending=[False, False, False, True],
+    )
+    players = ordered.drop_duplicates("player_id").set_index("player_id").player_name.to_dict()
     options = list(players)
     pid = player_col.selectbox(
         "Search player", options, index=kept_index("impact_player", options),
         format_func=players.get, key="impact_player",
-        help="Sorted by points + rebounds + assists per game in each player's latest season with available stats.",
+        help="Players from the latest completed season come first, ordered by on-court minutes in a team stint. "
+             "Players from other seasons are listed by most recent season, then minutes.",
     )
-    available = sorted(roster.loc[roster.player_id.eq(pid), "season"].unique(), reverse=True)
+    available = sorted(recent.loc[recent.player_id.eq(pid), "season"].unique(), reverse=True)
     completed = [s for s in available if completed_start is None or int(s[:4]) <= completed_start]
     default_season = available.index(completed[0]) if completed else 0
     season = season_col.selectbox(
@@ -1081,6 +1085,10 @@ def impact_page(impacts, teams, manifest):
         if counts.reindex(teams.team_id, fill_value=0).lt(20).any():
             min_games = 5
     latest = team_games.loc[team_games.season.eq(season) & team_games.team_id.eq(tid), "date"].max()
+    if pd.isna(latest):
+        history = historical_game_log("team_games")
+        if history is not None:
+            latest = history.loc[history.season.eq(season) & history.team_id.eq(tid), "date"].max()
     if pd.notna(latest):
         st.caption(f"{team_name(tid)} team games included through {latest:%b} {latest.day}, {latest.year}.")
     st.html(
@@ -1470,8 +1478,6 @@ def forecast_matchup(names, version, latest, key="team", model_name="team"):
         # A date or filter change can leave the widget pointing at a game outside this slate.
         st.session_state[game_key] = next(iter(labels))
     game_id = game_picker.selectbox(game_label, list(labels), format_func=labels.get, key=game_key)
-    if is_upcoming:
-        st.caption(f"Showing {len(days)} game {'date' if len(days) == 1 else 'dates'} in the schedule snapshot.")
     selected = slate.loc[game_id]
     return selected.home_team_id, selected.away_team_id, selected.date.date()
 
@@ -2098,8 +2104,7 @@ def player_page(p, t, teams, version):
         st.info(f"{player_names[a]} and {player_names[b]} haven't played against each other in this snapshot.")
     else:
         st.write(f"**{len(meetings)}** earlier {'game' if len(meetings) == 1 else 'games'} with both players "
-                 "on opposite teams, newest first.")
-        st.caption("Boxed values mark the higher stat in each game.")
+                 "on opposite teams, newest first. Boxes mark the higher stat in each game.")
         display = pd.DataFrame({
             "date": meetings.date.map(lambda d: f"{d:%b} {d.day}, {d.year}"),
             "game": [f"{codes.get(x, '?')} vs {codes.get(y, '?')}" for x, y in zip(meetings.team_id_a, meetings.team_id_b)],
@@ -2277,7 +2282,7 @@ def breakout_progress(history, selected, upcoming, forecast_start, version):
         <div class="ciq-cards">{"".join(cards)}</div>
     """)
     raw = f"{current.pra_per36:.1f}" if current is not None and pd.notna(current.pra_per36) else "Unavailable"
-    st.caption(f"**Production per 36 min this season:** {raw} · Points + rebounds + assists")
+    st.markdown(f"**Production per 36 min this season:** {raw} · Points + rebounds + assists")
     in_progress = hist.season_start.eq(forecast_start) & (forecast_start > latest_completed)
     for column, (metric, label) in zip(st.columns(3), metrics.items()):
         with column:
@@ -2309,11 +2314,10 @@ def breakout_progress(history, selected, upcoming, forecast_start, version):
                                height=185, margin=dict(l=34, r=14, t=32, b=28))
             show_chart(line, config={"displayModeBar": False})
     if provisional:
-        st.html(
-            '<small style="display:block">'
-            f'<b>* Early-season rankings.</b> {ranks.count()} players qualify with {min_games}+ games and 15+ minutes per game. '
-            'Percentiles can shift as more players qualify. The tracker returns to the standard 20-game minimum '
-            'once every team has 20 recorded games. Last season’s baseline and the official target use the standard cutoff.</small>'
+        st.markdown(
+            f"**\\* Early-season rankings.** {ranks.count()} players qualify with {min_games}+ games and 15+ minutes per game. "
+            "Percentiles can shift as more players qualify. The tracker returns to the standard 20-game minimum "
+            "once every team has 20 recorded games. Last season’s baseline and the official target use the standard cutoff."
         )
     if pd.notna(through):
         st.caption(
