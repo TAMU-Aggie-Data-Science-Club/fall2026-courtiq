@@ -5,7 +5,7 @@ from src.pipeline import APP
 from src import dashboard as ui
 
 PAGE_LABELS = {
-    "scouting-lab": "◎  Player Scouting Lab",
+    "scouting-lab": "◎  Scouting Lab",
     "on-off-impact": "◉  On/Off Impact",
     "team-forecasts": "◈  Team Forecasts",
     "player-matchups": "⇄  Player Matchups",
@@ -18,10 +18,11 @@ def update_page_url():
 
 
 def update_theme_url():
+    # Dark is the default, so only a switch to light is kept in the URL (?dark=0).
     if st.session_state["dark_mode"]:
-        st.query_params["dark"] = "1"
-    else:
         st.query_params.pop("dark", None)
+    else:
+        st.query_params["dark"] = "0"
 
 
 st.set_page_config(page_title="CourtIQ",page_icon="🏀",layout="wide")
@@ -54,11 +55,12 @@ if st.session_state.get("nav_page") != route:
     st.session_state["nav_page"] = route
 page = st.sidebar.radio("Explore", list(PAGE_LABELS), format_func=PAGE_LABELS.get,
                         key="nav_page", on_change=update_page_url)
-dark_mode = st.query_params.get("dark") == "1"
+dark_mode = st.query_params.get("dark") != "0"
 if st.session_state.get("dark_mode") != dark_mode:
     st.session_state["dark_mode"] = dark_mode
-st.sidebar.toggle("Dark mode", key="dark_mode", on_change=update_theme_url,
-                  help="Switch the page, cards and charts to dark colors.")
+theme_label = ":material/dark_mode: Dark mode" if dark_mode else ":material/light_mode: Light mode"
+st.sidebar.toggle(theme_label, key="dark_mode", on_change=update_theme_url,
+                  help="Switch between dark and light colors for the page, cards and charts.")
 if ui.dark():
     st.html(ui.DARK_STYLE)
 manifest_path=APP/"manifest.json"

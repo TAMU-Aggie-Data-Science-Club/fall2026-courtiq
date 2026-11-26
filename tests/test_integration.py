@@ -82,7 +82,7 @@ class RealTests(unittest.TestCase):
     def test_app_pages(self):
         from streamlit.testing.v1 import AppTest
         pages = {
-            "scouting-lab": "Player Scouting Lab",
+            "scouting-lab": "Scouting Lab",
             "on-off-impact": "On/Off Impact",
             "team-forecasts": "Team Forecasts",
             "player-matchups": "Player Matchups",
@@ -739,17 +739,17 @@ class FeedbackTests(unittest.TestCase):
 
         for page in ["scouting-lab", "on-off-impact", "team-forecasts", "player-matchups", "breakout-watch"]:
             at = AppTest.from_file("app.py", default_timeout=60).run()
-            at.sidebar.toggle(key="dark_mode").set_value(True).run()
-            self.assertEqual(at.query_params["dark"], ["1"])
+            self.assertTrue(at.sidebar.toggle(key="dark_mode").value, "dark mode is the default")
+            self.assertIn("dark_mode", at.sidebar.toggle(key="dark_mode").label)
             at.sidebar.radio[0].set_value(page).run()
-            self.assertEqual(at.query_params["dark"], ["1"])
+            self.assertNotIn("dark", at.query_params)
             self.assertFalse(at.exception, page)
             self.assertTrue(any("#121b22" in item.proto.body for item in at.get("html")), page)
             for chart in at.get("plotly_chart"):
                 spec = json.loads(chart.proto.spec)
                 self.assertEqual(spec["layout"].get("paper_bgcolor"), "#121b22", page)
         labels = [option for option in at.sidebar.radio[0].options]
-        self.assertTrue(any("Player Scouting Lab" in label for label in labels))
+        self.assertTrue(any(label.endswith(" Scouting Lab") and "Player" not in label for label in labels))
         self.assertTrue(any("On/Off Impact" in label for label in labels))
         refreshed = AppTest.from_file("app.py", default_timeout=60)
         refreshed.query_params.update(page="breakout-watch", dark="1")
@@ -757,8 +757,17 @@ class FeedbackTests(unittest.TestCase):
         self.assertFalse(refreshed.exception)
         self.assertTrue(refreshed.sidebar.toggle(key="dark_mode").value)
         refreshed.sidebar.toggle(key="dark_mode").set_value(False).run()
-        self.assertNotIn("dark", refreshed.query_params)
+        self.assertEqual(refreshed.query_params["dark"], ["0"])
+        self.assertIn("light_mode", refreshed.sidebar.toggle(key="dark_mode").label)
         self.assertEqual(refreshed.query_params["page"], ["breakout-watch"])
+        light = AppTest.from_file("app.py", default_timeout=60)
+        light.query_params.update(page="team-forecasts", dark="0")
+        light.run()
+        self.assertFalse(light.exception)
+        self.assertFalse(light.sidebar.toggle(key="dark_mode").value)
+        self.assertFalse(any("#121b22" in item.proto.body for item in light.get("html")))
+        light.sidebar.toggle(key="dark_mode").set_value(True).run()
+        self.assertNotIn("dark", light.query_params)
 
     def test_player_matchups_meeting_table_lists_both_players(self):
         from streamlit.testing.v1 import AppTest

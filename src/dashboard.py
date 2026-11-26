@@ -31,7 +31,7 @@ COLORS = dict(zip("ATL BOS BKN CHA CHI CLE DAL DEN DET GSW HOU IND LAC LAL MEM M
 # Each team's second brand color, tuned to stay readable on light and dark pages. Used when two
 # teams' primary colors are too close to tell apart (Kings vs Lakers, Bulls vs Heat, ...).
 SECONDARY_COLORS = dict(zip("ATL BOS BKN CHA CHI CLE DAL DEN DET GSW HOU IND LAC LAL MEM MIA MIL MIN NOP NYK OKC ORL PHI PHX POR SAC SAN TOR UTA WAS".split(),
-    "#a8b42a #b9a06a #a7b0b8 #4b3f8f #3a4148 #b8902f #a3aeb8 #24508f #1f5bab #c99a2e #a3aeb8 #1f3f7a #1f5bab #c99a2e #3b4f73 #e08b2e #c9b48a #5f8a3a #1f3f6b #1f5bab #e06a3b #a3aeb8 #c33b51 #e06a2e #3a4148 #9ea8b0 #3a4148 #c2a868 #2f3338 #1f4f8f".split()))
+    "#e8b02a #b9a06a #a7b0b8 #4b3f8f #3a4148 #b8902f #a3aeb8 #24508f #1f5bab #c99a2e #a3aeb8 #1f3f7a #1f5bab #c99a2e #3b4f73 #e08b2e #c9b48a #5f8a3a #1f3f6b #1f5bab #e06a3b #a3aeb8 #c33b51 #e06a2e #3a4148 #9ea8b0 #3a4148 #c2a868 #2f3338 #1f4f8f".split()))
 
 
 def team_code(teams, tid):
@@ -696,7 +696,7 @@ def scouting_player_order(pool):
 
 def scouting_page(seasons, teams, manifest):
     st.html(SCOUT_STYLE)
-    st.header("Player Scouting Lab")
+    st.header("Scouting Lab")
     page_intro("Explore a player’s strengths and weaknesses relative to eligible NBA players.",
                ["Search for a player, then pick a season", "Choose a scouting lens",
                 "Read the radar chart to compare the player with eligible peers"])
