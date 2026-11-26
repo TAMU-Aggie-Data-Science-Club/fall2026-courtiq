@@ -458,6 +458,13 @@ class RealTests(unittest.TestCase):
             self.assertEqual(traces["Stint shown above"]["text"], [number])
             self.assertFalse(traces["Stint shown above"]["showlegend"])
             self.assertFalse(traces["Other stints for this player"]["showlegend"])
+            self.assertNotIn("hoverlabel", traces["League peers"])
+            for trace_name in ("Stint shown above", "Other stints for this player"):
+                trace = traces[trace_name]
+                self.assertEqual(trace["hoverlabel"]["bordercolor"], trace["marker"]["line"]["color"])
+                self.assertEqual(len(trace["hoverlabel"]["bgcolor"]), len(trace["text"]))
+                self.assertTrue(trace["hovertemplate"].startswith("<b>%{customdata[2]}</b>"))
+                self.assertEqual("Selected team stint" in trace["hovertemplate"], trace_name == "Stint shown above")
             self.assertCountEqual(traces["Other stints for this player"]["text"],
                                   [str(i + 1) for i, name in enumerate(team_names)
                                    if name != teams[expected.team_id]])

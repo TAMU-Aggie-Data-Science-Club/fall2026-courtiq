@@ -123,6 +123,13 @@ def scout_peers(frame, min_minutes, selected_id, selected_team, min_games=20):
     return eligible.sort_values(["rank", "player_name", "team_id"])
 
 
+def _stint_tooltip_background(accent):
+    navy = (37, 55, 70)
+    team = bytes.fromhex(accent.lstrip("#"))
+    # Keep the fill dark enough for light text, even for bright team colors.
+    return "#" + bytes(round(.7 * base + .3 * color) for base, color in zip(navy, team)).hex()
+
+
 def scatter(frame, selected_id, selected_team):
     import plotly.graph_objects as go
 
@@ -144,14 +151,25 @@ def scatter(frame, selected_id, selected_team):
             if highlighted else dict(color="#8997a0", size=7, opacity=.5)
         )
         custom = rows[["on_per48", "off_per48"]].map(signed_margin).assign(stint=rows.stint_label)
+        hover_label = None
+        heading = "%{customdata[2]}"
+        if highlighted:
+            hover_label = dict(
+                bgcolor=rows.team_accent.map(_stint_tooltip_background).tolist(),
+                bordercolor=rows.team_accent.tolist(),
+                font=dict(color="#fff7ed"),
+            )
+            heading = f"<b>{heading}</b>"
+            if primary:
+                heading += "<br>Selected team stint"
         fig.add_trace(go.Scatter(
             x=rows.off_per48, y=rows.on_per48,
             mode="markers+text" if highlighted else "markers", text=numbers,
             textposition="middle center", textfont=dict(color="#202c36", size=11, weight=700),
-            name=name, marker=marker, showlegend=not highlighted,
-            customdata=custom,
+            name=name, marker=marker, showlegend=not highlighted, zorder=1 if highlighted else 0,
+            customdata=custom, hoverlabel=hover_label,
             hovertemplate=(
-                "%{customdata[2]}<br>On court: %{customdata[0]}<br>On bench: %{customdata[1]}<extra></extra>"
+                heading + "<br>On court: %{customdata[0]}<br>On bench: %{customdata[1]}<extra></extra>"
             ),
         ))
     if not frame.empty:
