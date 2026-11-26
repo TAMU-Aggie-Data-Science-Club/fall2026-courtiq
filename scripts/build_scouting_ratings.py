@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from src.pipeline import APP, RAW
+from src.pipeline import APP, PROCESSED, RAW
 
 KEYS = ["gameId", "home"]
 TOLERANCE = 0.05000001  # Include both edges of the rounding interval.
@@ -72,9 +72,13 @@ def reconstruct(rows):
 
 def build(raw_dir):
     bounds = team_bounds(raw_dir / "TeamStatisticsExtended.csv")
-    games = pd.read_csv(APP / "player_games.csv.gz", usecols=[
+    games_path = PROCESSED / "player_games.csv.gz"
+    if not games_path.exists():
+        games_path = APP / "player_games.csv.gz"
+        print("Full cleaned player logs are unavailable. Using bundled game logs only.")
+    games = pd.read_csv(games_path, usecols=[
         "game_id", "player_id", "home", "played", "season_start", "minutes",
-    ]).query("played and season_start >= 2023")
+    ]).query("played")
     keys = ["game_id", "player_id", "home"]
     source_fields = ["numMinutes", "points", "reboundsDefensive", "possessions", "plusMinusPoints",
                      "offensiveRating", "defensiveRating", "netRating"]
@@ -117,7 +121,7 @@ def build(raw_dir):
 
     seasons = pd.read_csv(APP / "player_season.csv.gz", usecols=[
         "player_id", "season_start", "team_id", "games", "minutes", "mpg", "dreb",
-    ]).query("team_id == 0 and season_start >= 2023")
+    ]).query("team_id == 0")
     check = seasons.merge(ratings, on=["player_id", "season_start", "games"], suffixes=("", "_games"),
                           validate="one_to_one")
     check = check.loc[np.isclose(check.minutes, check.minutes_games, rtol=0, atol=1e-6)].copy()

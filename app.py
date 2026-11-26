@@ -4,6 +4,26 @@ import streamlit as st
 from src.pipeline import APP
 from src import dashboard as ui
 
+PAGE_LABELS = {
+    "scouting-lab": "◎  Player Scouting Lab",
+    "on-off-impact": "◉  On/Off Impact",
+    "team-forecasts": "◈  Team Forecasts",
+    "player-matchups": "⇄  Player Matchups",
+    "breakout-watch": "↗  Breakout Watch",
+}
+
+
+def update_page_url():
+    st.query_params["page"] = st.session_state["nav_page"]
+
+
+def update_theme_url():
+    if st.session_state["dark_mode"]:
+        st.query_params["dark"] = "1"
+    else:
+        st.query_params.pop("dark", None)
+
+
 st.set_page_config(page_title="CourtIQ",page_icon="🏀",layout="wide")
 st.markdown("""<style>
 .stMainBlockContainer{max-width:1180px;padding-top:3.75rem}
@@ -26,10 +46,19 @@ h1{font-size:2rem !important}
 </style>""", unsafe_allow_html=True)
 st.html(ui.SHARED_STYLE)
 st.sidebar.markdown('<div class="court-brand"><strong>CourtIQ</strong><small>NBA scouting &amp; forecasts</small></div>',unsafe_allow_html=True)
-page = st.sidebar.radio("Explore", ["Players","Teams","Compare","Trends"],
-    format_func={"Players":"◎  Player Scouting & Impact","Teams":"◈  Team Forecasts",
-                 "Compare":"⇄  Player Matchups","Trends":"↗  Breakout Watch"}.get)
-st.sidebar.toggle("Dark mode", key="dark_mode", help="Switch the page, cards and charts to dark colors.")
+route = st.query_params.get("page")
+if route not in PAGE_LABELS:
+    route = "scouting-lab"
+    st.query_params["page"] = route
+if st.session_state.get("nav_page") != route:
+    st.session_state["nav_page"] = route
+page = st.sidebar.radio("Explore", list(PAGE_LABELS), format_func=PAGE_LABELS.get,
+                        key="nav_page", on_change=update_page_url)
+dark_mode = st.query_params.get("dark") == "1"
+if st.session_state.get("dark_mode") != dark_mode:
+    st.session_state["dark_mode"] = dark_mode
+st.sidebar.toggle("Dark mode", key="dark_mode", on_change=update_theme_url,
+                  help="Switch the page, cards and charts to dark colors.")
 if ui.dark():
     st.html(ui.DARK_STYLE)
 manifest_path=APP/"manifest.json"
@@ -42,12 +71,14 @@ version=manifest["version"]
 teams=ui.table("teams",version).sort_values("team_name")
 st.sidebar.divider()
 st.sidebar.caption("Historical box scores · Offline forecasts")
-if page=="Players":
-    mode=st.radio("Player tools",["Scouting Lab","On/Off Impact"],horizontal=True)
-    if mode=="Scouting Lab": ui.scouting_page(ui.table("player_season",version),teams,manifest)
-    else: ui.impact_page(ui.table("on_off",version),teams,manifest)
-elif page=="Teams": ui.team_page(ui.table("team_games",version),teams,version)
-elif page=="Compare": ui.player_page(ui.table("player_games",version),ui.table("team_games",version),teams,version)
-else: ui.breakout_page(ui.table("player_season",version),version)
-if page in ("Compare","Trends"):
-    ui.methodology(manifest)
+if page == "scouting-lab":
+    ui.scouting_page(ui.table("player_season", version), teams, manifest)
+elif page == "on-off-impact":
+    ui.impact_page(ui.table("on_off", version), teams, manifest)
+elif page == "team-forecasts":
+    ui.team_page(ui.table("team_games", version), teams, version)
+elif page == "player-matchups":
+    ui.player_page(ui.table("player_games", version), ui.table("team_games", version), teams, version)
+else:
+    ui.breakout_page(ui.table("player_season", version), version)
+ui.sources_and_limitations(page)

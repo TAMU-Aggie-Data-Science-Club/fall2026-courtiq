@@ -24,7 +24,7 @@
       "fallback": "training mean when no prior season games",
       "mae": 4.718593394233923,
       "rmse": 6.226281864720564,
-      "bias": -0.12428208881417305
+      "bias": -0.12428208881417306
     },
     {
       "target": "rebounds",
@@ -32,7 +32,7 @@
       "fallback": "training mean when no prior season games",
       "mae": 1.94978308390633,
       "rmse": 2.5847989457550136,
-      "bias": -0.03469602737331316
+      "bias": -0.03469602737331318
     },
     {
       "target": "assists",

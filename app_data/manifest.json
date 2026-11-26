@@ -1,5 +1,5 @@
 {
-  "built_at": "2026-11-21T01:50:38.454647+00:00",
+  "built_at": "2026-11-25T08:32:17.990487+00:00",
   "start_season": 2015,
   "source_urls": [
     "https://www.kaggle.com/datasets/eoinamoore/historical-nba-data-and-player-box-scores",
@@ -17,39 +17,19 @@
   "advanced_metrics": "TS/eFG reconstructed from totals. USG/AST%/ORTG/DRTG/NRTG/PIE season values unavailable: no authoritative aggregation supplied.",
   "sources": [
     {
-      "file": "Games.csv",
-      "bytes": 11278726,
-      "sha256": "ec0bef615a412a3d00ce2022d9663212324f7a175dbd4164d6c8ff331007e987"
-    },
-    {
-      "file": "LeagueSchedule24_25.csv",
-      "bytes": 147173,
-      "sha256": "a9064ca1fb41912c9517080268f5820ae52797f45de005bf1dc3fa9f0121e448"
-    },
-    {
-      "file": "LeagueSchedule25_26.csv",
-      "bytes": 190434,
-      "sha256": "fb3b4151da8c6fc6161bd868f657867b124a61a149d2876d2a65f95ed099ebbb"
-    },
-    {
-      "file": "LeagueSchedule26_27.csv",
-      "bytes": 170924,
-      "sha256": "699de07c6012104020c1cbcc7a03ecbb82eb132bc925399d5ff488a7ef3cf090"
-    },
-    {
       "file": "Players.csv",
       "bytes": 534548,
       "sha256": "e7d530faa10368a0c8fad6ab111a86f0adc6bfdecbda27945f802afe11bf3858"
     },
     {
       "file": "PlayerStatistics.csv",
-      "bytes": 391680521,
-      "sha256": "948af3c72ede4b97d470eafebb861de500eab0ad286d49d1f6f04f655f22e8dd"
+      "bytes": 391864933,
+      "sha256": "caed618a93b25fc31e1626d4d99a8efaecf2f41f2395d1be48f2e1baef8286d0"
     },
     {
       "file": "PlayerStatisticsExtended.csv",
-      "bytes": 457097698,
-      "sha256": "c6865d3c2d5f8a55b6303a7cff61493d068c92857a3e1af06b18c895346f6a69"
+      "bytes": 457463737,
+      "sha256": "2d83f36978341cce3c92bd1f513b5654ce5da3646e51948a23d50b73fb98018c"
     },
     {
       "file": "TeamHistories.csv",
@@ -58,13 +38,13 @@
     },
     {
       "file": "TeamStatistics.csv",
-      "bytes": 36171305,
-      "sha256": "6431260de09afc724880c72a191f53da8291f3a78e202a950f857ea7c78424f3"
+      "bytes": 36187980,
+      "sha256": "9917a995c02102693eec4b46c307d23806c7500378c8a05b5fff23842a5e8893"
     },
     {
       "file": "TeamStatisticsExtended.csv",
-      "bytes": 38476348,
-      "sha256": "469f055ac9e1836e792124eeee23b76af93e479ee6a9554290a5fd037058cd1c"
+      "bytes": 38507990,
+      "sha256": "9d0a230302a0119a3e0a78989fa14354b94de790ce1f7d902287dc34ddd3a556"
     },
     {
       "file": "nba_2008-2026.csv",
@@ -84,12 +64,12 @@
     "2023-24": 1230,
     "2024-25": 1224,
     "2025-26": 1230,
-    "2026-27": 226
+    "2026-27": 258
   },
   "tables": {
     "games": {
-      "rows": 13429,
-      "app_rows": 3910,
+      "rows": 13461,
+      "app_rows": 3942,
       "columns": {
         "game_id": "int64",
         "date": "datetime64[ns]",
@@ -105,11 +85,11 @@
         "total": "int64",
         "overtime": "float64"
       },
-      "app_bytes": 51892
+      "app_bytes": 52336
     },
     "team_games": {
-      "rows": 26858,
-      "app_rows": 7820,
+      "rows": 26922,
+      "app_rows": 7884,
       "columns": {
         "game_id": "int64",
         "team_id": "int64",
@@ -189,11 +169,11 @@
         "pre_tov_pct_20": "float64",
         "pre_tov_pct_season": "float64"
       },
-      "app_bytes": 3018910
+      "app_bytes": 3042920
     },
     "player_games": {
-      "rows": 284075,
-      "app_rows": 83916,
+      "rows": 284758,
+      "app_rows": 84599,
       "columns": {
         "game_id": "int64",
         "player_id": "int64",
@@ -244,11 +224,11 @@
         "rest": "float64",
         "back_to_back": "bool"
       },
-      "app_bytes": 7241961
+      "app_bytes": 7302994
     },
     "player_season": {
-      "rows": 13698,
-      "app_rows": 13698,
+      "rows": 13714,
+      "app_rows": 13714,
       "columns": {
         "player_id": "int64",
         "team_id": "int64",
@@ -311,11 +291,11 @@
         "experience": "float64",
         "is_top50": "bool"
       },
-      "app_bytes": 2537491
+      "app_bytes": 2541147
     },
     "on_off": {
-      "rows": 7269,
-      "app_rows": 7269,
+      "rows": 7277,
+      "app_rows": 7277,
       "columns": {
         "player_id": "int64",
         "team_id": "int64",
@@ -341,7 +321,7 @@
         "without_netrtg": "float64",
         "reliability": "object"
       },
-      "app_bytes": 527508
+      "app_bytes": 528275
     },
     "top50_players": {
       "rows": 50,
@@ -419,11 +399,11 @@
         "teamAbbrev": "object",
         "team_code": "object"
       },
-      "app_bytes": 681
+      "app_bytes": 672
     },
     "player_vs_team": {
-      "rows": 137016,
-      "app_rows": 137016,
+      "rows": 137476,
+      "app_rows": 137476,
       "columns": {
         "player_id": "int64",
         "opponent_id": "int64",
@@ -433,11 +413,11 @@
         "rebounds_pg": "float64",
         "assists_pg": "float64"
       },
-      "app_bytes": 929865
+      "app_bytes": 932824
     },
     "odds_history": {
-      "rows": 13429,
-      "app_rows": 3910,
+      "rows": 13461,
+      "app_rows": 3942,
       "columns": {
         "game_id": "int64",
         "date": "datetime64[ns]",
@@ -463,9 +443,9 @@
         "went_over": "float64",
         "line_timing": "object"
       },
-      "app_bytes": 70557
+      "app_bytes": 71032
     }
   },
-  "pipeline_sha256": "589778f4e16079158a38365aa376b649257e4412acfdb1ee0e642e7f380db40d",
-  "version": "888fbe7340f0"
+  "pipeline_sha256": "84b0a927448f758b0ff0b547fc8f9cba9ee1b9bee84d88d00e3c94e51f97713d",
+  "version": "b92ab9c449c4"
 }

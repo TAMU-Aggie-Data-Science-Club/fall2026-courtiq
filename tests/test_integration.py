@@ -81,13 +81,32 @@ class RealTests(unittest.TestCase):
 
     def test_app_pages(self):
         from streamlit.testing.v1 import AppTest
-        for page in ["Players","Teams","Compare","Trends"]:
-            at=AppTest.from_file("app.py",default_timeout=40).run()
-            at.sidebar.radio[0].set_value(page).run()
-            self.assertEqual(len(at.exception),0,str(at.exception))
-        at=AppTest.from_file("app.py",default_timeout=40).run()
-        next(widget for widget in at.radio if widget.label=="Player tools").set_value("On/Off Impact").run()
-        self.assertEqual(len(at.exception),0,str(at.exception))
+        pages = {
+            "scouting-lab": "Player Scouting Lab",
+            "on-off-impact": "On/Off Impact",
+            "team-forecasts": "Team Forecasts",
+            "player-matchups": "Player Matchups",
+            "breakout-watch": "Breakout Watch",
+        }
+        for route, title in pages.items():
+            with self.subTest(route=route):
+                app = AppTest.from_file("app.py", default_timeout=40)
+                app.query_params["page"] = route
+                app.run()
+                self.assertFalse(app.exception)
+                self.assertEqual(app.sidebar.radio(key="nav_page").value, route)
+                self.assertTrue(any(item.value == title for item in app.header))
+                self.assertEqual([item.label for item in app.expander].count("Sources & limitations"), 1)
+                if route in ("scouting-lab", "on-off-impact"):
+                    self.assertTrue(any('class="ciq-steps"' in item.proto.body for item in app.get("html")))
+        app = AppTest.from_file("app.py", default_timeout=40)
+        app.query_params.update(page="unknown", ref="test")
+        app.run()
+        self.assertEqual(app.query_params["page"], ["scouting-lab"])
+        app.sidebar.radio(key="nav_page").set_value("on-off-impact").run()
+        self.assertFalse(app.exception)
+        self.assertEqual(app.query_params["page"], ["on-off-impact"])
+        self.assertEqual(app.query_params["ref"], ["test"])
 
     def test_scouting_filters_and_lenses(self):
         from streamlit.testing.v1 import AppTest
@@ -107,7 +126,7 @@ class RealTests(unittest.TestCase):
             return [item.value for item in at.markdown if item.value.endswith("scouting report**")]
 
         self.assertEqual(report_headings(), ["**All-around scouting report**"])
-        self.assertIn("Sources and how to read the rankings", [item.label for item in at.expander])
+        self.assertIn("How to read the rankings", [item.label for item in at.expander])
         self.assertNotIn("Sources, definitions & limitations", [item.label for item in at.expander])
         latest = self.p.loc[self.p.played & self.p.season.eq(season), "date"].max()
         expected_date = f"Games included through {latest:%b} {latest.day}, {latest.year}"
@@ -135,6 +154,10 @@ class RealTests(unittest.TestCase):
         self.assertEqual(len(labels), 8)
         self.assertTrue(any("3PA per game" in label for label in labels))
         self.assertEqual(report_headings(), ["**Shooting scouting report**"])
+        at.button_group(key="scout_lens").set_value([]).run()
+        self.assertFalse(at.exception)
+        self.assertEqual(report_headings(), ["**Shooting scouting report**"])
+        self.assertEqual(at.session_state["scout_lens"], "Shooting")
 
         at.button_group(key="scout_lens").set_value(["Playmaking"]).run()
         playmaking_labels = radar()["layout"]["polar"]["angularaxis"]["ticktext"]
@@ -192,7 +215,7 @@ class RealTests(unittest.TestCase):
         at=AppTest.from_file("app.py",default_timeout=60).run()
         cached_team_forecast.clear()
         with patch("src.models.team.predict", wraps=team.predict) as predict:
-            at.sidebar.radio[0].set_value("Teams").run()
+            at.sidebar.radio[0].set_value("team-forecasts").run()
             self.assertEqual(at.radio(key="team_matchup_mode").value, "Upcoming Games")
             if not any(picker.key == "team_upcoming_game" for picker in at.selectbox):
                 at.radio(key="team_matchup_mode").set_value("Past Games").run()
@@ -229,7 +252,7 @@ class RealTests(unittest.TestCase):
         self.assertEqual(spread_marker["x"], [4.5])
         self.assertIn(spread_marker["y"][0], (0, .25))
         self.assertNotIn("Spread", chart["layout"]["yaxis"]["ticktext"])
-        at.sidebar.radio[0].set_value("Compare").run()
+        at.sidebar.radio[0].set_value("player-matchups").run()
         self.assertEqual(len(at.exception),0,str(at.exception))
         self.assertFalse(at.button)
         cards = next(item.proto.body for item in at.get("html") if 'class="ciq-cards"' in item.proto.body)
@@ -257,7 +280,7 @@ class RealTests(unittest.TestCase):
         from src.dashboard import cached_team_forecast
 
         at = AppTest.from_file("app.py", default_timeout=40).run()
-        at.sidebar.radio[0].set_value("Teams").run()
+        at.sidebar.radio[0].set_value("team-forecasts").run()
         at.radio(key="team_matchup_mode").set_value("Custom Matchup").run()
         cutoff = max(pd.Timestamp(task["inference_available_after"]) for task in load("team")["tasks"].values())
         earliest = cutoff + pd.Timedelta(days=1)
@@ -299,7 +322,7 @@ class RealTests(unittest.TestCase):
         from streamlit.testing.v1 import AppTest
 
         at = AppTest.from_file("app.py", default_timeout=40).run()
-        at.sidebar.radio[0].set_value("Teams").run()
+        at.sidebar.radio[0].set_value("team-forecasts").run()
         upcoming = [picker for picker in at.selectbox if picker.key == "team_upcoming_game"]
         team_id = 0
         if upcoming:
@@ -407,7 +430,7 @@ class RealTests(unittest.TestCase):
         from streamlit.testing.v1 import AppTest
 
         app = AppTest.from_file("app.py", default_timeout=40).run()
-        next(widget for widget in app.radio if widget.label == "Player tools").set_value("On/Off Impact").run()
+        app.sidebar.radio[0].set_value("on-off-impact").run()
         season = app.selectbox(key="impact_season").value
         rows = pd.read_csv(APP / "on_off.csv.gz").query("season == @season")
         complete = rows.dropna(subset=["on_per48", "off_per48"])
@@ -420,6 +443,7 @@ class RealTests(unittest.TestCase):
         for expected in stints.itertuples():
             app.selectbox(key="impact_team_filter").set_value(int(expected.team_id)).run()
             app.selectbox(key="impact_player").set_value(player_id).run()
+            app.selectbox(key="impact_season").set_value(season).run()
             self.assertFalse(app.exception)
             identity = next(item.proto.body for item in app.get("html") if 'class="impact-identity"' in item.proto.body)
             self.assertIn(teams[expected.team_id], identity)
@@ -434,6 +458,13 @@ class RealTests(unittest.TestCase):
             self.assertEqual(traces["Stint shown above"]["text"], [number])
             self.assertFalse(traces["Stint shown above"]["showlegend"])
             self.assertFalse(traces["Other stints for this player"]["showlegend"])
+            self.assertNotIn("hoverlabel", traces["League peers"])
+            for trace_name in ("Stint shown above", "Other stints for this player"):
+                trace = traces[trace_name]
+                self.assertEqual(trace["hoverlabel"]["bordercolor"], trace["marker"]["line"]["color"])
+                self.assertEqual(len(trace["hoverlabel"]["bgcolor"]), len(trace["text"]))
+                self.assertTrue(trace["hovertemplate"].startswith("<b>%{customdata[2]}</b>"))
+                self.assertEqual("Selected team stint" in trace["hovertemplate"], trace_name == "Stint shown above")
             self.assertCountEqual(traces["Other stints for this player"]["text"],
                                   [str(i + 1) for i, name in enumerate(team_names)
                                    if name != teams[expected.team_id]])
@@ -444,6 +475,7 @@ class RealTests(unittest.TestCase):
         no_missed = complete.loc[complete.games_missed.eq(0) & complete.valid_on_games.ge(10)].iloc[0]
         app.selectbox(key="impact_team_filter").set_value(int(no_missed.team_id)).run()
         app.selectbox(key="impact_player").set_value(int(no_missed.player_id)).run()
+        app.selectbox(key="impact_season").set_value(season).run()
         self.assertFalse(app.exception)
         headings = [item.value for item in app.subheader]
         self.assertIn("On/Off over time", headings)
@@ -462,11 +494,14 @@ class RealTests(unittest.TestCase):
         small_sample = complete.loc[complete.reliability.eq("Low")].iloc[0]
         app.selectbox(key="impact_team_filter").set_value(int(small_sample.team_id)).run()
         app.selectbox(key="impact_player").set_value(int(small_sample.player_id)).run()
+        app.selectbox(key="impact_season").set_value(season).run()
         self.assertFalse(app.exception)
         self.assertTrue(any("Sample size: Limited" in item.value for item in app.info))
 
-        app.selectbox(key="impact_season").set_value("2026-27").run()
         app.selectbox(key="impact_team_filter").set_value(0).run()
+        current = pd.read_csv(APP / "on_off.csv.gz").query("season == '2026-27'").iloc[0]
+        app.selectbox(key="impact_player").set_value(int(current.player_id)).run()
+        app.selectbox(key="impact_season").set_value("2026-27").run()
         app.slider(key="impact_peer_minutes").set_value(0).run()
         self.assertFalse(app.exception)
         self.assertTrue(any("needs 5 games played" in item.value for item in app.caption))
@@ -479,6 +514,42 @@ class RealTests(unittest.TestCase):
         self.assertFalse(app.exception)
         self.assertTrue(any("reaches this minutes cutoff" in item.value for item in app.info))
         self.assertFalse(any('class="ciq-table"' in item.proto.body for item in app.get("html")))
+
+    def test_impact_picker_limits_seasons_and_keeps_valid_choices(self):
+        from streamlit.testing.v1 import AppTest
+
+        app = AppTest.from_file("app.py", default_timeout=40)
+        app.query_params["page"] = "on-off-impact"
+        app.run()
+        rows = pd.read_csv(APP / "on_off.csv.gz").query("season_start >= 2015")
+        completed_start = json.loads((APP / "manifest.json").read_text())["latest_completed_start"]
+        completed = rows.loc[rows.season_start.eq(completed_start)].sort_values(
+            ["minutes_on", "player_name"], ascending=[False, True],
+        )
+        expected_order = completed.drop_duplicates("player_id").player_name.tolist()
+        self.assertEqual(app.selectbox(key="impact_player").options[:len(expected_order)], expected_order)
+        by_player = rows.groupby("player_id").season.agg(lambda values: sorted(set(values), reverse=True))
+        veteran = int(by_player[by_player.map(len).eq(rows.season.nunique())].index[0])
+        limited = int(by_player[by_player.map(len).eq(1)].index[0])
+
+        app.selectbox(key="impact_player").set_value(veteran).run()
+        self.assertEqual(app.selectbox(key="impact_season").options, by_player[veteran])
+        other_season = next(season for season in reversed(by_player[veteran]) if season not in by_player[limited])
+        app.selectbox(key="impact_season").set_value(other_season).run()
+        self.assertEqual(app.selectbox(key="impact_player").value, veteran)
+        stint = rows.loc[rows.player_id.eq(veteran) & rows.season.eq(other_season)].nlargest(1, "minutes_on").iloc[0]
+        history = pd.read_csv(APP / "impact_history_team_games.csv.gz", parse_dates=["date"])
+        latest = history.loc[history.season.eq(other_season) & history.team_id.eq(stint.team_id), "date"].max()
+        expected_caption = f"team games included through {latest:%b} {latest.day}, {latest.year}"
+        self.assertTrue(any(expected_caption in item.value for item in app.caption))
+        app.selectbox(key="impact_player").set_value(limited).run()
+        self.assertEqual(app.selectbox(key="impact_season").options, by_player[limited])
+        self.assertEqual(app.selectbox(key="impact_season").value, by_player[limited][0])
+        tid = int(rows.loc[rows.player_id.eq(limited), "team_id"].iloc[0])
+        app.selectbox(key="impact_team_filter").set_value(tid).run()
+        self.assertEqual(app.selectbox(key="impact_player").value, limited)
+        self.assertEqual(app.selectbox(key="impact_season").value, by_player[limited][0])
+        self.assertFalse(app.exception)
 
     def test_impact_trend_weights_by_minutes_and_rolls_off_old_games(self):
         from src.features.impact import rolling_margins
@@ -504,7 +575,7 @@ class RealTests(unittest.TestCase):
         celtics = int(names[names.str.contains("Celtics")].index[0])
         bulls = int(names[names.str.contains("Bulls")].index[0])
         meetings = games.loc[games.home_team_id.isin([celtics, bulls]) & games.away_team_id.isin([celtics, bulls])]
-        for page, key in (("Compare", "player"), ("Teams", "team")):
+        for page, key in (("player-matchups", "player"), ("team-forecasts", "team")):
             with self.subTest(page=page):
                 at = AppTest.from_file("app.py", default_timeout=60).run()
                 at.sidebar.radio[0].set_value(page).run()
@@ -571,7 +642,7 @@ class FeedbackTests(unittest.TestCase):
 
         at = AppTest.from_file("app.py", default_timeout=40).run()
         seasons = pd.read_csv(APP / "player_season.csv.gz", low_memory=False)
-        recent = seasons.query("season_start >= 2023 and team_id == 0")
+        recent = seasons.query("season_start >= 2015 and team_id == 0")
         options = at.selectbox(key="scout_player").options
         latest = recent.sort_values("season_start").drop_duplicates("player_id", keep="last")
         latest = latest[latest.games.ge(5) & latest.mpg.ge(15)].nlargest(5, "pra_pg")
@@ -579,10 +650,18 @@ class FeedbackTests(unittest.TestCase):
 
         veteran = recent.groupby("player_id").season.nunique().idxmax()
         at.selectbox(key="scout_player").set_value(int(veteran)).run()
+        expected = sorted(recent.loc[recent.player_id.eq(veteran), "season"], reverse=True)
+        self.assertEqual(at.selectbox(key="scout_season").options, expected)
+        history = pd.read_csv(APP / "impact_history_player_games.csv.gz", parse_dates=["date"])
+        historical_dates = history.loc[history.played].groupby("season").date.max()
         for season in at.selectbox(key="scout_season").options:
             at.selectbox(key="scout_season").set_value(season).run()
             self.assertFalse(at.exception)
             self.assertEqual(at.selectbox(key="scout_player").value, int(veteran))
+            if season in historical_dates:
+                latest = historical_dates[season]
+                expected_caption = f"Games included through {latest:%b} {latest.day}, {latest.year}"
+                self.assertTrue(any(expected_caption in item.value for item in at.caption))
 
         flagg = int(recent.loc[recent.player_name.eq("Cooper Flagg"), "player_id"].iloc[0])
         at.selectbox(key="scout_player").set_value(flagg).run()
@@ -658,23 +737,34 @@ class FeedbackTests(unittest.TestCase):
     def test_every_page_renders_in_dark_mode(self):
         from streamlit.testing.v1 import AppTest
 
-        for page in ["Players", "Teams", "Compare", "Trends"]:
+        for page in ["scouting-lab", "on-off-impact", "team-forecasts", "player-matchups", "breakout-watch"]:
             at = AppTest.from_file("app.py", default_timeout=60).run()
             at.sidebar.toggle(key="dark_mode").set_value(True).run()
+            self.assertEqual(at.query_params["dark"], ["1"])
             at.sidebar.radio[0].set_value(page).run()
+            self.assertEqual(at.query_params["dark"], ["1"])
             self.assertFalse(at.exception, page)
             self.assertTrue(any("#121b22" in item.proto.body for item in at.get("html")), page)
             for chart in at.get("plotly_chart"):
                 spec = json.loads(chart.proto.spec)
                 self.assertEqual(spec["layout"].get("paper_bgcolor"), "#121b22", page)
         labels = [option for option in at.sidebar.radio[0].options]
-        self.assertTrue(any("Player Scouting & Impact" in label for label in labels))
+        self.assertTrue(any("Player Scouting Lab" in label for label in labels))
+        self.assertTrue(any("On/Off Impact" in label for label in labels))
+        refreshed = AppTest.from_file("app.py", default_timeout=60)
+        refreshed.query_params.update(page="breakout-watch", dark="1")
+        refreshed.run()
+        self.assertFalse(refreshed.exception)
+        self.assertTrue(refreshed.sidebar.toggle(key="dark_mode").value)
+        refreshed.sidebar.toggle(key="dark_mode").set_value(False).run()
+        self.assertNotIn("dark", refreshed.query_params)
+        self.assertEqual(refreshed.query_params["page"], ["breakout-watch"])
 
     def test_player_matchups_meeting_table_lists_both_players(self):
         from streamlit.testing.v1 import AppTest
 
         at = AppTest.from_file("app.py", default_timeout=60).run()
-        at.sidebar.radio[0].set_value("Compare").run()
+        at.sidebar.radio[0].set_value("player-matchups").run()
         self.assertFalse(at.exception)
         tables = [item.proto.body for item in at.get("html") if 'class="ciq-table"' in item.proto.body]
         meetings = next((body for body in tables if '<th class="group"' in body and ">PTS<" in body), None)

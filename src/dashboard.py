@@ -50,6 +50,8 @@ def dark():
 
 SHARED_STYLE = """
 <style>
+[data-baseweb="calendar"][role="application"] [role="gridcell"][aria-label^="Choose"]:hover > div {
+    background:#f2d9c8 !important;color:#202c36 !important;border-radius:50%;}
 .ciq-table-wrap {overflow-x:auto; border:1px solid #8794a455; border-radius:.65rem; margin:.35rem 0 1rem;}
 .ciq-table {width:100%; border-collapse:collapse; font-size:.9rem;}
 .ciq-table th {text-align:left; font-weight:650; padding:.55rem .75rem; white-space:nowrap;
@@ -97,6 +99,11 @@ DARK_STYLE = """
 .stApp [data-baseweb="select"] > div, .stApp [data-baseweb="input"], .stApp [data-baseweb="input"] > div,
 .stApp [data-baseweb="base-input"], .stApp input, .stApp textarea {
     background:#1b2731 !important; color:#ece6da !important; border-color:#3a4a56 !important;}
+.stApp :is([data-baseweb="input"], [data-baseweb="select"] > div):focus-within,
+.stApp :is(input, textarea):focus {
+    outline:2px solid #f2a46f; outline-offset:1px;}
+.stApp :is([data-baseweb="input"], [data-baseweb="select"]):focus-within input:focus {
+    outline:none;}
 .stApp [data-baseweb="select"] svg, .stApp [data-testid="stNumberInput"] button svg {fill:#ece6da; color:#ece6da;}
 .stApp [data-testid="stNumberInput"] button {background:#22313c; color:#ece6da; border-color:#3a4a56;}
 .stApp .st-key-team_spread :is([data-baseweb="input"], [data-baseweb="base-input"]):has(input:disabled),
@@ -110,9 +117,35 @@ DARK_STYLE = """
 [data-baseweb="popover"] > div, [data-baseweb="menu"], [data-baseweb="popover"] ul, [role="listbox"],
 [data-baseweb="calendar"], [data-baseweb="calendar"] > div, [data-testid="stPopoverBody"] {
     background:#1b2731 !important; color:#ece6da !important;}
-[role="option"], [role="option"] *, [data-baseweb="calendar"] * {color:#ece6da !important;}
+[role="option"], [role="option"] * {color:#ece6da !important;}
 [role="option"]:hover, [role="option"][aria-selected="true"] {background:#2a3b47 !important;}
-[data-baseweb="calendar"] [aria-selected="true"] div {background:#b54b1c !important;}
+[data-baseweb="calendar"][role="application"] {
+    color-scheme:dark;background:#1b2731 !important;color:#ece6da !important;}
+[data-baseweb="popover"]:has([data-baseweb="calendar"]) {
+    background:#1b2731 !important;}
+[data-baseweb="calendar"][role="application"] :where(div,span) {
+    background:transparent !important;color:inherit;}
+[data-baseweb="calendar"][role="application"] :where([role="columnheader"],[aria-hidden="true"]) {
+    color:#b9c2c8;}
+[data-baseweb="calendar"][role="application"] svg {color:currentColor;fill:currentColor;}
+[data-baseweb="calendar"][role="application"] :is(button,[role="gridcell"],[role="button"]) {
+    color:#ece6da !important;background:transparent !important;}
+[data-baseweb="calendar"][role="application"] :is(button,[role="button"]):hover {
+    background:#2a3b47 !important;}
+/* Paint day states directly so the light-theme pseudo-elements cannot cover them. */
+[data-baseweb="calendar"][role="application"] [role="gridcell"]::before,
+[data-baseweb="calendar"][role="application"] [role="gridcell"]::after {
+    display:none !important;}
+[data-baseweb="calendar"][role="application"] [role="row"],
+[data-baseweb="calendar"][role="application"] [role="gridcell"]:empty {
+    background:#1b2731 !important;box-shadow:none !important;}
+[data-baseweb="calendar"][role="application"] [role="gridcell"][aria-label^="Choose"]:hover > div {
+    background:#385366 !important;color:#fff7ed !important;}
+[data-baseweb="calendar"][role="application"] [role="gridcell"][aria-label^="Selected"] > div {
+    background:#a8441a !important;color:#fff7ed !important;border-radius:50%;}
+[data-baseweb="calendar"][role="application"] :is([aria-label^="Not available"],[aria-disabled="true"],:disabled) {
+    color:#81909b !important;}
+[data-baseweb="calendar"][role="application"] :focus-visible {outline:2px solid #f2a46f;outline-offset:1px;}
 .stApp [data-testid="stExpander"] details {background:#16222b; border-color:#34444f;}
 .stApp [data-testid="stExpander"] summary {background:#16222b !important; color:#ece6da !important;}
 .stApp [data-testid="stExpander"] summary:hover {background:#1d2b35 !important;}
@@ -136,7 +169,20 @@ DARK_STYLE = """
 .stApp [data-testid="stMain"] [data-testid="stBaseButton-pillsActive"] {
     background:color-mix(in srgb,#e08b4f 22%,#1b2731) !important; color:#ffd8bd !important; border-color:#e08b4f !important;}
 .stApp [data-testid="stMain"] [data-testid="stBaseButton-segmented_controlActive"] p {color:#ffd8bd !important;}
-.stApp [data-testid="stAlert"] > div {background:#1d2b35 !important; color:#ece6da;}
+.stApp :is([data-testid="stMain"],[data-testid="stSidebar"],[data-testid="stHeader"])
+button:is([kind^="secondary"],[kind^="primary"],[data-testid^="stBaseButton"],[data-testid="stPopoverButton"]):not(:disabled):hover,
+[data-testid="stPopoverBody"] button:not(:disabled):hover,
+.stApp [data-testid="stNumberInput"] button:not(:disabled):hover {
+    box-shadow:inset 0 0 0 1px #8794a4;}
+.stApp :is(.st-key-team_swap_sides,.st-key-player_swap_sides) button,
+.stApp :is(.st-key-team_swap_sides,.st-key-player_swap_sides) button:is(:hover,:active,:focus) {
+    background:#1b2731 !important;color:#ece6da !important;border-color:#3a4a56 !important;}
+.stApp [data-testid="stAlert"] [data-testid="stAlertContainer"] {
+    background:var(--alert-bg,#1d2b35) !important;border-inline-start:3px solid var(--alert-accent,#8794a4);}
+.stApp [data-testid="stAlertContainer"]:has([data-testid="stAlertContentInfo"]) {
+    --alert-bg:#193449;--alert-accent:#74b9f3;}
+.stApp [data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]) {
+    --alert-bg:#3c2d1a;--alert-accent:#ffc477;}
 .stApp [data-testid="stAlert"] * {color:#ece6da;}
 .stApp [data-testid="stMain"] label[data-baseweb="radio"]:not(:has(input:checked)) > div:first-child {
     background-color:#1b2731 !important; border:2px solid #7d8a93 !important;}
@@ -144,8 +190,12 @@ DARK_STYLE = """
     background-color:#1b2731 !important;}
 .stApp [data-testid="stMain"] label[data-baseweb="radio"]:has(input:checked) > div:first-child > div {
     background-color:#121b22 !important;}
-.stApp [data-testid="stSlider"] [data-testid="stSliderTickBarMin"], .stApp [data-testid="stSlider"] [data-testid="stSliderTickBarMax"] {color:#b9c2c8;}
+.stApp [data-testid="stSlider"] [data-testid="stSliderTickBar"] > span {color:#b9c2c8 !important;}
 .stApp [data-testid="stMain"] [data-testid="stCheckbox"] label span:first-child {border-color:#a7b1b8;}
+.stApp .st-key-team_use_spread label:has(> input[type="checkbox"]:not(:checked):not(:disabled)) > div:first-child {
+    background-color:#62798a !important;}
+.stApp .st-key-team_use_spread label:has(> input[type="checkbox"]:not(:checked):not(:disabled)):hover > div:first-child {
+    background-color:#728a9b !important;}
 .stApp [data-testid="stMain"] [data-testid="stProgress"] p {color:#ece6da;}
 .stApp hr {border-color:#34444f;}
 .stApp a {color:#f2a46f;}
@@ -165,7 +215,7 @@ def show_chart(fig, **kwargs):
     if dark():
         c = DARK_CHART
         fig.update_layout(paper_bgcolor=c["paper"], plot_bgcolor=c["plot"], font_color=c["text"],
-                          legend_font_color=c["text"], hoverlabel=dict(bgcolor="#1b2731", font_color=c["text"]))
+                          legend_font_color=c["text"])
         fig.update_xaxes(automargin=True, gridcolor=c["grid"], zerolinecolor=c["grid"], linecolor=c["grid"],
                          tickfont_color=c["muted"], title_font_color=c["text"])
         fig.update_yaxes(automargin=True, gridcolor=c["grid"], zerolinecolor=c["grid"], linecolor=c["grid"],
@@ -337,14 +387,32 @@ def choose(frame,key,label="Player"):
     return st.selectbox(label,list(names),index=kept_index(key,list(names)),format_func=names.get,key=key)
 
 
-def methodology(manifest):
-    with st.expander("Sources, definitions & limitations"):
-        st.markdown(f"[NBA box scores]({SOURCE_NBA}) · [Historical betting data]({SOURCE_ODDS}) · [The Odds API](https://the-odds-api.com/)")
-        st.write(f"Dataset version {manifest['version']}; built {manifest['built_at']}. Source coverage is the supplied download, not a live NBA feed.")
-        st.write("CourtIQ qualification: 20 played games & 15 minutes/game. Shooting percentiles need 50 attempts. Rankings use all eligible players in that season, not just the Top 50. Missing is not zero.")
-        st.write("Box scores do not identify guarding assignments, injuries or confirmed active rosters. On/off is observational and reflects teammates and opponents.")
-        st.write("2024-25 has source coverage omissions. Four current-season games lack duration/player-minute coverage; those values remain unavailable. DNP comparisons use only explicit rows.")
-        st.write("Historical line timing is unknown. Market comparisons are retrospective, not a demonstrated trading strategy. Predictions are educational statistical estimates; actual outcomes may differ.")
+def sources_and_limitations(page):
+    notes = {
+        "scouting-lab": (
+            "**Coverage** — The date near the filters gives the latest recorded player game for the selected season. Some games are missing, including in 2024–25.",
+            "**Rankings** — Percentiles depend on who qualifies. Box scores capture only part of a defender’s contribution, and defensive and net ratings also reflect teammates and opponents.",
+        ),
+        "on-off-impact": (
+            "**Coverage** — Games with missing duration or player minutes can reduce the on/off sample.",
+            "**Interpreting impact** — Teammates, opponents, and rotations influence scoring margins. The splits describe how the team performed during the recorded minutes.",
+        ),
+        "team-forecasts": (
+            "**Forecasts** — Estimates use earlier games from the available snapshot. Injuries and lineup changes can affect the actual outcome.",
+            f"**Market lines** — Current lines are shown when a cached snapshot is available. The timing of historical lines is unknown. [The Odds API](https://the-odds-api.com/) · [Historical betting data]({SOURCE_ODDS})",
+        ),
+        "player-matchups": (
+            "**Availability** — Recorded player appearances cannot confirm future lineups or injuries.",
+            "**Past meetings** — Box scores show how both players performed in the same game. Minutes, roles, and shooting variance can matter a lot in a small sample, and the data doesn’t identify who guarded whom.",
+        ),
+        "breakout-watch": (
+            "**Preseason estimates** — Forecasts use the prior completed season. The tracker uses available season box scores, and early results can shift as more games are recorded.",
+            "**Historical evaluation** — The backtest shows performance for one held-out season. Individual breakout chances describe model estimates.",
+        ),
+    }
+    source = f"**Box scores** — This tool uses the NBA records in CourtIQ’s data snapshot. [Historical NBA box scores]({SOURCE_NBA})"
+    with st.expander("Sources & limitations"):
+        st.markdown("\n".join(f"- {item}" for item in (source, *notes[page])))
 
 
 @st.cache_data
@@ -368,6 +436,10 @@ def scouting_team_game_counts(version):
 
 def scouting_freshness(season, manifest):
     latest = scouting_game_dates(manifest["version"]).get(season)
+    if pd.isna(latest):
+        history = historical_game_log("player_games")
+        if history is not None:
+            latest = history.loc[history.season.eq(season) & history.played, "date"].max()
     built = pd.to_datetime(manifest.get("built_at"), utc=True, errors="coerce")
     labels = []
     if pd.notna(latest):
@@ -485,9 +557,9 @@ def scouting_advanced_stats(row):
 
 
 def scouting_sources():
-    with st.expander("Sources and how to read the rankings"):
-        comparison, production, shooting, defense, advanced, badges = st.tabs(
-            ["Rankings & sources", "Game stats", "Shooting", "Defense & rebounding", "Advanced stats", "Badges"]
+    with st.expander("How to read the rankings"):
+        comparison, production, shooting, defense, playmaking, advanced, badges = st.tabs(
+            ["Rankings", "Game stats", "Shooting", "Defense & rebounding", "Playmaking", "Advanced stats", "Badges"]
         )
         with comparison:
             st.markdown(
@@ -497,7 +569,6 @@ def scouting_sources():
 - **Rank** — Rank 1 is the highest value for most stats. Defensive Rating and Foul Avoidance rank lower raw values first. “Rank 12 of 230” means 230 players qualified for that stat. Tied players share the higher position, shown as “T-12”. 👑 marks rank 1 when standard rankings apply.
 - **Percentile** — Places a player's value on a 0–100 scale within that stat's eligible group. A 90th percentile is near the top tenth. The page rounds percentile labels to whole numbers.
 - **Unranked** — The player missed a qualification cutoff or the stat was unavailable. Look under the stat for the reason.
-- **Coverage** — The date near the filters shows the latest player game in the selected season. The snapshot preparation date is recorded in CourtIQ. The original download date is unavailable. Some games are missing, including in 2024–25. The latest season may be in progress. [Historical NBA box scores]({SOURCE_NBA})
                 """
             )
         with production:
@@ -546,6 +617,15 @@ def scouting_sources():
                 "**Limits.** Ratings reflect teammates and lineups. Steals and blocks capture specific "
                 "plays, and the lens describes a statistical profile."
             )
+        with playmaking:
+            st.markdown(
+                """
+- **Assists per game** — Total assists divided by games played. Shows how many baskets a player sets up per appearance.
+- **Assists per 36 minutes** — Total assists divided by minutes played, multiplied by 36. Compares assist production on the same playing-time scale.
+- **Assists per turnover** — Total assists divided by total turnovers. The ratio is unavailable when the player has zero turnovers.
+- **Points per game** — Total points divided by games played. Shows scoring volume alongside assist production.
+                """
+            )
         with advanced:
             st.markdown(
                 """
@@ -593,6 +673,12 @@ def scouting_defense_cohort(league, ratings_modified):
     return comparison
 
 
+def keep_scouting_lens_selected():
+    lens = st.session_state.get("scout_lens")
+    if lens is None:
+        st.session_state["scout_lens"] = st.session_state.get("last_scout_lens", "All-Around")
+    else:
+        st.session_state["last_scout_lens"] = lens
 def kept_index(key, options, default=0):
     """Index of the widget's previous choice when it is still an option, so a filter change keeps it."""
     current = st.session_state.get(key)
@@ -611,7 +697,10 @@ def scouting_player_order(pool):
 def scouting_page(seasons, teams, manifest):
     st.html(SCOUT_STYLE)
     st.header("Player Scouting Lab")
-    recent = seasons[seasons.season_start.ge(2023)]
+    page_intro("Explore a player’s strengths and weaknesses relative to eligible NBA players.",
+               ["Search for a player, then pick a season", "Choose a scouting lens",
+                "Read the radar chart to compare the player with eligible peers"])
+    recent = seasons[seasons.season_start.ge(2015)]
     if recent.empty:
         st.info("No player seasons are available.")
         return
@@ -627,6 +716,7 @@ def scouting_page(seasons, teams, manifest):
         "Find by team", [0, *all_team_ids],
         format_func=lambda tid: "All teams" if tid == 0 else team_names.get(tid, f"Team {tid}"),
         key="scout_team",
+        help="Find players who appeared for this team in any season since 2015–16.",
     )
     pool = scouting.canonical(recent)
     if team_id:
@@ -654,7 +744,7 @@ def scouting_page(seasons, teams, manifest):
     stints = season_rows[season_rows.team_id.ne(0)]
     team_ids = sorted(stints.team_id.unique(), key=lambda tid: team_names.get(tid, str(tid)))
     scouting_freshness(season, manifest)
-    st.caption("The team filter finds players who appeared for that team since 2023-24. Seasons list only the "
+    st.caption("The team filter finds players who appeared for that team since 2015–16. Seasons list only the "
                "years the player appeared. Stats combine all teams played for, and ranks compare across the "
                "league in the selected season.")
 
@@ -724,10 +814,12 @@ def scouting_page(seasons, teams, manifest):
             "with at least 15 minutes per game played. With so few games, percentiles can be "
             "misleading and change sharply after a single game."
         )
+    if "scout_lens" not in st.session_state:
+        st.session_state["scout_lens"] = st.session_state.get("last_scout_lens", "All-Around")
     lens = st.segmented_control(
-        "Scouting lens", list(scouting.LENSES), default="All-Around",
-        selection_mode="single", key="scout_lens", width="stretch",
-    ) or "All-Around"
+        "Scouting lens", list(scouting.LENSES),
+        selection_mode="single", key="scout_lens", width="stretch", on_change=keep_scouting_lens_selected,
+    )
     breakdown = all_around
     report_title = "All-around scouting report"
     summary = all_around_summary
@@ -813,13 +905,33 @@ def impact_player_games(version):
     return pd.read_csv(APP / "player_games.csv.gz", usecols=columns, parse_dates=["date"])
 
 
+@st.cache_data(show_spinner=False)
+def impact_history(path, modified):
+    return pd.read_csv(path, parse_dates=["date"])
+
+
+def historical_game_log(name):
+    path = APP / f"impact_history_{name}.csv.gz"
+    if path.exists():
+        return impact_history(path, path.stat().st_mtime_ns)
+    return None
+
+
 def impact_trend(season, pid, tid, team_games, version, color):
     st.subheader("On/Off over time")
     st.write(
         "See how the team's on-court and bench margins changed as the season progressed. "
         "Each point uses the last 10 appearances with usable box scores, starting after five."
     )
-    player_games = impact_player_games(version)
+    if team_games.season.eq(season).any():
+        player_games = impact_player_games(version)
+    else:
+        player_games = historical_game_log("player_games")
+        team_games = historical_game_log("team_games")
+        if (player_games is None or team_games is None
+                or not player_games.season.eq(season).any() or not team_games.season.eq(season).any()):
+            st.info("Game-by-game trend unavailable. This snapshot has season summaries only for this season.")
+            return
     stint = player_games.loc[
         player_games.season.eq(season) & player_games.player_id.eq(pid) & player_games.team_id.eq(tid)
     ]
@@ -835,7 +947,6 @@ def impact_league_comparison(season_rows, teams, pid, tid, min_games=20):
     from html import escape
 
     st.subheader("Compare with other players")
-    st.caption("Each ranking is for one player and team stint. The filter applies to the league comparison below.")
     minimum = st.slider("Minimum on-court minutes", 0, 2500, 500, 100, key="impact_peer_minutes")
     st.caption(
         f"To appear in the scatterplot and table, a player needs {min_games} games played for that team, "
@@ -866,7 +977,6 @@ def impact_league_comparison(season_rows, teams, pid, tid, min_games=20):
     numbers = dict(zip(player_stints.team_id, range(1, len(player_stints) + 1)))
     peers["stint_number"] = peers.team_id.map(numbers).where(peers.player_id.eq(pid)).astype("Int64")
     selected = peers.loc[peers.selected]
-    st.caption(f"{len(peers):,} qualifying team stints across the league")
     if selected.empty:
         st.caption("The selected team stint is outside this comparison group.")
     else:
@@ -910,35 +1020,52 @@ def impact_page(impacts, teams, manifest):
 
     st.html(IMPACT_STYLE)
     st.header("On/Off Impact")
-    st.write(
-        "See how a team scored relative to its opponents with a player on the court and on the bench. "
-        "Pick a season and player to see how those margins changed over time and how they compare across the league."
-    )
-    available = sorted(impacts.loc[impacts.season_start.ge(2023), "season"].unique(), reverse=True)
-    if not available:
+    page_intro("See how a team scored relative to its opponents with a player on the court and on the bench.",
+               ["Find a player, then pick a season and team stint", "Compare on-court and bench scoring margins",
+                "Use the league scatterplot to compare qualifying stints"])
+    recent = impacts.loc[impacts.season_start.ge(2015)]
+    if recent.empty:
         st.info("No on/off seasons are available.")
         return
 
-    season_col, team_col, player_col = st.columns([1, 1.25, 1.75])
-    season = season_col.selectbox("Season", available, index=min(1, len(available) - 1), key="impact_season")
-    season_rows = impacts.loc[impacts.season.eq(season)]
+    version = manifest["version"]
+    completed_start = manifest.get("latest_completed_start")
     lookup = teams.set_index("team_id").team_name.to_dict()
 
     def team_name(tid):
         return lookup.get(tid, f"Team {tid}")
 
-    team_ids = sorted(season_rows.team_id.unique(), key=team_name)
+    team_col, player_col, season_col = st.columns([1.25, 1.75, 1])
+    team_ids = sorted(recent.team_id.unique(), key=team_name)
     team_filter = team_col.selectbox(
         "Find by team", [0, *team_ids], key="impact_team_filter",
         format_func=lambda tid: team_name(tid) if tid else "All teams",
+        help="Find players who appeared for this team in any season since 2015–16.",
     )
-    roster = season_rows if team_filter == 0 else season_rows.loc[season_rows.team_id.eq(team_filter)]
-    with player_col:
-        pid = choose(roster, "impact_player", "Search player")
-    if pid is None:
-        st.info("No players match the selected season and team.")
-        return
+    stints_for_search = recent.loc[recent.team_id.eq(team_filter)] if team_filter else recent
+    ordered = stints_for_search.assign(completed_season=stints_for_search.season_start.eq(completed_start))
+    ordered = ordered.sort_values(
+        ["completed_season", "season_start", "minutes_on", "player_name"],
+        ascending=[False, False, False, True],
+    )
+    players = ordered.drop_duplicates("player_id").set_index("player_id").player_name.to_dict()
+    options = list(players)
+    pid = player_col.selectbox(
+        "Search player", options, index=kept_index("impact_player", options),
+        format_func=players.get, key="impact_player",
+        help="Players from the latest completed season come first, ordered by on-court minutes in a team stint. "
+             "Players from other seasons are listed by most recent season, then minutes.",
+    )
+    available = sorted(recent.loc[recent.player_id.eq(pid), "season"].unique(), reverse=True)
+    completed = [s for s in available if completed_start is None or int(s[:4]) <= completed_start]
+    default_season = available.index(completed[0]) if completed else 0
+    season = season_col.selectbox(
+        "Season", available, key="impact_season", index=kept_index("impact_season", available, default_season),
+    )
+    st.caption("The team filter finds players who appeared for that team since 2015–16. "
+               "Choose a team stint to see that team's results for the selected season.")
 
+    season_rows = recent.loc[recent.season.eq(season)]
     player_rows = season_rows.loc[season_rows.player_id.eq(pid)].sort_values("minutes_on", ascending=False)
     stints = player_rows.team_id.tolist()
     tid = stints[0]
@@ -951,15 +1078,17 @@ def impact_page(impacts, teams, manifest):
         )
     row = player_rows.loc[player_rows.team_id.eq(tid)].iloc[0]
     color = team_color(teams, tid)
-    version = manifest["version"]
     team_games = table("team_games", version)
     min_games = 20
-    completed_start = manifest.get("latest_completed_start")
-    if season == available[0] and completed_start is not None and int(season[:4]) > completed_start:
+    if season == recent.season.max() and completed_start is not None and int(season[:4]) > completed_start:
         counts = team_games.loc[team_games.season.eq(season)].groupby("team_id").game_id.nunique()
         if counts.reindex(teams.team_id, fill_value=0).lt(20).any():
             min_games = 5
     latest = team_games.loc[team_games.season.eq(season) & team_games.team_id.eq(tid), "date"].max()
+    if pd.isna(latest):
+        history = historical_game_log("team_games")
+        if history is not None:
+            latest = history.loc[history.season.eq(season) & history.team_id.eq(tid), "date"].max()
     if pd.notna(latest):
         st.caption(f"{team_name(tid)} team games included through {latest:%b} {latest.day}, {latest.year}.")
     st.html(
@@ -980,7 +1109,7 @@ def impact_page(impacts, teams, manifest):
     ])
     if pd.notna(row.on_per48) or pd.notna(row.off_per48):
         show_chart(impact.margin_bars(row, color, chart_neutral(color)), use_container_width=True)
-    st.write(impact.court_summary(row))
+    st.write(impact.court_summary(row, team_name(tid)))
     if row.reliability == "Low":
         st.info("Sample size: Limited. A short stretch on either side can make this comparison swing.")
     elif pd.notna(row.reliability):
@@ -1349,8 +1478,6 @@ def forecast_matchup(names, version, latest, key="team", model_name="team"):
         # A date or filter change can leave the widget pointing at a game outside this slate.
         st.session_state[game_key] = next(iter(labels))
     game_id = game_picker.selectbox(game_label, list(labels), format_func=labels.get, key=game_key)
-    if is_upcoming:
-        st.caption(f"Showing {len(days)} game {'date' if len(days) == 1 else 'dates'} in the schedule snapshot.")
     selected = slate.loc[game_id]
     return selected.home_team_id, selected.away_team_id, selected.date.date()
 
@@ -1977,8 +2104,7 @@ def player_page(p, t, teams, version):
         st.info(f"{player_names[a]} and {player_names[b]} haven't played against each other in this snapshot.")
     else:
         st.write(f"**{len(meetings)}** earlier {'game' if len(meetings) == 1 else 'games'} with both players "
-                 "on opposite teams, newest first.")
-        st.caption("Boxed values mark the higher stat in each game.")
+                 "on opposite teams, newest first. Boxes mark the higher stat in each game.")
         display = pd.DataFrame({
             "date": meetings.date.map(lambda d: f"{d:%b} {d.day}, {d.year}"),
             "game": [f"{codes.get(x, '?')} vs {codes.get(y, '?')}" for x, y in zip(meetings.team_id_a, meetings.team_id_b)],
@@ -2156,7 +2282,7 @@ def breakout_progress(history, selected, upcoming, forecast_start, version):
         <div class="ciq-cards">{"".join(cards)}</div>
     """)
     raw = f"{current.pra_per36:.1f}" if current is not None and pd.notna(current.pra_per36) else "Unavailable"
-    st.caption(f"**Production per 36 min this season:** {raw} · Points + rebounds + assists")
+    st.markdown(f"**Production per 36 min this season:** {raw} · Points + rebounds + assists")
     in_progress = hist.season_start.eq(forecast_start) & (forecast_start > latest_completed)
     for column, (metric, label) in zip(st.columns(3), metrics.items()):
         with column:
@@ -2188,11 +2314,10 @@ def breakout_progress(history, selected, upcoming, forecast_start, version):
                                height=185, margin=dict(l=34, r=14, t=32, b=28))
             show_chart(line, config={"displayModeBar": False})
     if provisional:
-        st.html(
-            '<small style="display:block">'
-            f'<b>* Early-season rankings.</b> {ranks.count()} players qualify with {min_games}+ games and 15+ minutes per game. '
-            'Percentiles can shift as more players qualify. The tracker returns to the standard 20-game minimum '
-            'once every team has 20 recorded games. Last season’s baseline and the official target use the standard cutoff.</small>'
+        st.markdown(
+            f"**\\* Early-season rankings.** {ranks.count()} players qualify with {min_games}+ games and 15+ minutes per game. "
+            "Percentiles can shift as more players qualify. The tracker returns to the standard 20-game minimum "
+            "once every team has 20 recorded games. Last season’s baseline and the official target use the standard cutoff."
         )
     if pd.notna(through):
         st.caption(
