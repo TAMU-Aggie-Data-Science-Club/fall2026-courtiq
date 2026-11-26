@@ -521,13 +521,14 @@ class RealTests(unittest.TestCase):
         app = AppTest.from_file("app.py", default_timeout=40)
         app.query_params["page"] = "on-off-impact"
         app.run()
-        rows = pd.read_csv(APP / "on_off.csv.gz").query("season_start >= 2023")
+        rows = pd.read_csv(APP / "on_off.csv.gz").query("season_start >= 2015")
         by_player = rows.groupby("player_id").season.agg(lambda values: sorted(set(values), reverse=True))
         veteran = int(by_player[by_player.map(len).eq(rows.season.nunique())].index[0])
         limited = int(by_player[by_player.map(len).eq(1)].index[0])
 
         app.selectbox(key="impact_player").set_value(veteran).run()
-        other_season = next(season for season in by_player[veteran] if season not in by_player[limited])
+        self.assertEqual(app.selectbox(key="impact_season").options, by_player[veteran])
+        other_season = next(season for season in reversed(by_player[veteran]) if season not in by_player[limited])
         app.selectbox(key="impact_season").set_value(other_season).run()
         self.assertEqual(app.selectbox(key="impact_player").value, veteran)
         app.selectbox(key="impact_player").set_value(limited).run()
@@ -630,7 +631,7 @@ class FeedbackTests(unittest.TestCase):
 
         at = AppTest.from_file("app.py", default_timeout=40).run()
         seasons = pd.read_csv(APP / "player_season.csv.gz", low_memory=False)
-        recent = seasons.query("season_start >= 2023 and team_id == 0")
+        recent = seasons.query("season_start >= 2015 and team_id == 0")
         options = at.selectbox(key="scout_player").options
         latest = recent.sort_values("season_start").drop_duplicates("player_id", keep="last")
         latest = latest[latest.games.ge(5) & latest.mpg.ge(15)].nlargest(5, "pra_pg")
@@ -638,6 +639,8 @@ class FeedbackTests(unittest.TestCase):
 
         veteran = recent.groupby("player_id").season.nunique().idxmax()
         at.selectbox(key="scout_player").set_value(int(veteran)).run()
+        expected = sorted(recent.loc[recent.player_id.eq(veteran), "season"], reverse=True)
+        self.assertEqual(at.selectbox(key="scout_season").options, expected)
         for season in at.selectbox(key="scout_season").options:
             at.selectbox(key="scout_season").set_value(season).run()
             self.assertFalse(at.exception)
