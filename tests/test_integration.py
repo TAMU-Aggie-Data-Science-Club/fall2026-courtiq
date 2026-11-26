@@ -740,7 +740,7 @@ class FeedbackTests(unittest.TestCase):
         for page in ["scouting-lab", "on-off-impact", "team-forecasts", "player-matchups", "breakout-watch"]:
             at = AppTest.from_file("app.py", default_timeout=60).run()
             self.assertTrue(at.sidebar.toggle(key="dark_mode").value, "dark mode is the default")
-            self.assertIn("dark_mode", at.sidebar.toggle(key="dark_mode").label)
+            self.assertEqual(at.sidebar.toggle(key="dark_mode").label, "Dark mode")
             at.sidebar.radio[0].set_value(page).run()
             self.assertNotIn("dark", at.query_params)
             self.assertFalse(at.exception, page)
@@ -758,7 +758,7 @@ class FeedbackTests(unittest.TestCase):
         self.assertTrue(refreshed.sidebar.toggle(key="dark_mode").value)
         refreshed.sidebar.toggle(key="dark_mode").set_value(False).run()
         self.assertEqual(refreshed.query_params["dark"], ["0"])
-        self.assertIn("light_mode", refreshed.sidebar.toggle(key="dark_mode").label)
+        self.assertEqual(refreshed.sidebar.toggle(key="dark_mode").label, "Light mode")
         self.assertEqual(refreshed.query_params["page"], ["breakout-watch"])
         light = AppTest.from_file("app.py", default_timeout=60)
         light.query_params.update(page="team-forecasts", dark="0")

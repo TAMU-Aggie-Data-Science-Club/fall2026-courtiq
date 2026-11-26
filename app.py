@@ -39,6 +39,26 @@ h1,h2,h3{letter-spacing:-.035em}
 [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked){background:#324653;box-shadow:inset 3px 0 #ff9c60}
 
 [data-testid="stMetric"]{border:1px solid #8794a455;border-radius:12px;padding:12px 16px}
+/* Sun / moon theme switch (sidebar). Off = light: white knob on the left with an orange sun.
+   On = dark: knob slides right with a blue moon. The inactive icon shows faintly on the track. */
+.st-key-dark_mode [data-testid="stCheckbox"]>label{gap:.7rem;align-items:center}
+.st-key-dark_mode [data-testid="stCheckbox"]>label>div:first-child{position:relative;flex:0 0 76px;width:76px;height:36px;border-radius:999px;margin:0;
+  background:#dfe4ea !important;box-shadow:inset 0 2px 5px #0000002e;transition:background .25s}
+.st-key-dark_mode [data-testid="stCheckbox"]>label>div:first-child::before,.st-key-dark_mode [data-testid="stCheckbox"]>label>div:first-child::after{content:"";position:absolute;
+  top:9px;width:18px;height:18px;background-size:contain;background-repeat:no-repeat;transition:opacity .25s}
+.st-key-dark_mode [data-testid="stCheckbox"]>label>div:first-child::before{left:11px;background-image:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23c9d0e2'%20stroke-width='2'%20stroke-linecap='round'%3E%3Ccircle%20cx='12'%20cy='12'%20r='4.2'/%3E%3Cpath%20d='M12%202.5v2.2M12%2019.3v2.2M2.5%2012h2.2M19.3%2012h2.2M5.3%205.3l1.6%201.6M17.1%2017.1l1.6%201.6M5.3%2018.7l1.6-1.6M17.1%206.9l1.6-1.6'/%3E%3C/svg%3E");opacity:0}
+.st-key-dark_mode [data-testid="stCheckbox"]>label>div:first-child::after{right:11px;background-image:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23a3abb8'%20stroke-width='2'%20stroke-linejoin='round'%3E%3Cpath%20d='M20%2014.6A8.2%208.2%200%200%201%209.4%204a8.2%208.2%200%201%200%2010.6%2010.6z'/%3E%3Cpath%20d='M17.2%202.8l.7%201.6%201.6.7-1.6.7-.7%201.6-.7-1.6-1.6-.7%201.6-.7z'%20fill='%23a3abb8'%20stroke='none'/%3E%3C/svg%3E");opacity:1}
+.st-key-dark_mode [data-testid="stCheckbox"]>label>div:first-child>div{position:absolute;top:3px;left:3px;width:30px;height:30px;margin:0;
+  border-radius:50%;background:#fff url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23f59e0b'%20stroke-width='2'%20stroke-linecap='round'%3E%3Ccircle%20cx='12'%20cy='12'%20r='4.2'/%3E%3Cpath%20d='M12%202.5v2.2M12%2019.3v2.2M2.5%2012h2.2M19.3%2012h2.2M5.3%205.3l1.6%201.6M17.1%2017.1l1.6%201.6M5.3%2018.7l1.6-1.6M17.1%206.9l1.6-1.6'/%3E%3C/svg%3E") center/19px no-repeat !important;
+  box-shadow:0 2px 6px #00000040;transform:none !important;transition:left .25s,background .25s}
+.st-key-dark_mode [data-testid="stWidgetLabel"] p{white-space:nowrap}
+.st-key-dark_mode [data-testid="stCheckbox"]>label:has(input:checked)>div:first-child{background:#66729c !important}
+.st-key-dark_mode [data-testid="stCheckbox"]>label:has(input:checked)>div:first-child::before{opacity:1}
+.st-key-dark_mode [data-testid="stCheckbox"]>label:has(input:checked)>div:first-child::after{opacity:0}
+.st-key-dark_mode [data-testid="stCheckbox"]>label:has(input:checked)>div:first-child>div{left:43px;
+  background:#fff url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%234257c8'%20stroke-width='2'%20stroke-linejoin='round'%3E%3Cpath%20d='M20%2014.6A8.2%208.2%200%200%201%209.4%204a8.2%208.2%200%201%200%2010.6%2010.6z'/%3E%3Cpath%20d='M17.2%202.8l.7%201.6%201.6.7-1.6.7-.7%201.6-.7-1.6-1.6-.7%201.6-.7z'%20fill='%234257c8'%20stroke='none'/%3E%3C/svg%3E") center/19px no-repeat !important}
+.st-key-dark_mode [data-testid="stCheckbox"]>label:has(input:focus-visible)>div:first-child{outline:2px solid #ff9c60;outline-offset:2px}
+
 @media(max-width:640px){
 .stMainBlockContainer{padding:3.25rem 1rem 2.5rem}
 h1{font-size:2rem !important}
@@ -58,7 +78,7 @@ page = st.sidebar.radio("Explore", list(PAGE_LABELS), format_func=PAGE_LABELS.ge
 dark_mode = st.query_params.get("dark") != "0"
 if st.session_state.get("dark_mode") != dark_mode:
     st.session_state["dark_mode"] = dark_mode
-theme_label = ":material/dark_mode: Dark mode" if dark_mode else ":material/light_mode: Light mode"
+theme_label = "Dark mode" if dark_mode else "Light mode"
 st.sidebar.toggle(theme_label, key="dark_mode", on_change=update_theme_url,
                   help="Switch between dark and light colors for the page, cards and charts.")
 if ui.dark():
