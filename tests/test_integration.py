@@ -56,6 +56,19 @@ class RealTests(unittest.TestCase):
 
         self.enterContext(patch.object(ButtonGroup, "indices", property(indices)))
 
+        from streamlit.testing.v1.element_tree import Radio
+
+        # AppTest matches a radio choice through format_func, which it cannot rebuild for the stint
+        # radio's team ids. Tests select stints by their visible label instead.
+        original_format = Radio.format_func
+
+        def format_func(widget):
+            if not (widget.key or "").startswith("scout_view"):
+                return original_format.fget(widget)
+            return lambda value: value if isinstance(value, str) else widget.options[widget.proto.value]
+
+        self.enterContext(patch.object(Radio, "format_func", property(format_func)))
+
     @classmethod
     def setUpClass(cls):
         cls.t=pd.read_csv(APP/"team_games.csv.gz",parse_dates=["date"])
@@ -522,12 +535,12 @@ class RealTests(unittest.TestCase):
         app.query_params["page"] = "on-off-impact"
         app.run()
         rows = pd.read_csv(APP / "on_off.csv.gz").query("season_start >= 2015")
-        completed_start = json.loads((APP / "manifest.json").read_text())["latest_completed_start"]
-        completed = rows.loc[rows.season_start.eq(completed_start)].sort_values(
-            ["minutes_on", "player_name"], ascending=[False, True],
-        )
-        expected_order = completed.drop_duplicates("player_id").player_name.tolist()
-        self.assertEqual(app.selectbox(key="impact_player").options[:len(expected_order)], expected_order)
+        seasons = pd.read_csv(APP / "player_season.csv.gz", low_memory=False)
+        latest = seasons.query("season_start >= 2015 and team_id == 0").sort_values("season_start")
+        latest = latest[latest.player_id.isin(rows.player_id)].drop_duplicates("player_id", keep="last")
+        latest = latest[latest.games.ge(5) & latest.mpg.ge(15)].nlargest(10, "pra_pg")
+        expected_order = latest.player_name.tolist()
+        self.assertEqual(app.selectbox(key="impact_player").options[:10], expected_order)
         by_player = rows.groupby("player_id").season.agg(lambda values: sorted(set(values), reverse=True))
         veteran = int(by_player[by_player.map(len).eq(rows.season.nunique())].index[0])
         limited = int(by_player[by_player.map(len).eq(1)].index[0])
@@ -667,6 +680,38 @@ class FeedbackTests(unittest.TestCase):
         at.selectbox(key="scout_player").set_value(flagg).run()
         expected = sorted(recent.loc[recent.player_id.eq(flagg), "season"], reverse=True)
         self.assertEqual(at.selectbox(key="scout_season").options, expected)
+
+    def test_scouting_traded_player_can_view_each_team_stint(self):
+        import re
+        from streamlit.testing.v1 import AppTest
+
+        seasons = pd.read_csv(APP / "player_season.csv.gz", low_memory=False)
+        stints = seasons.query("season == '2024-25' and team_id != 0")
+        luka = int(seasons.loc[seasons.player_name.eq("Luka Doncic"), "player_id"].iloc[0])
+        at = AppTest.from_file("app.py", default_timeout=60).run()
+        at.selectbox(key="scout_player").set_value(luka).run()
+        at.selectbox(key="scout_season").set_value("2024-25").run()
+        key = f"scout_view_{luka}_2024-25"
+        self.assertEqual(at.radio(key=key).options,
+                         ["Full season", "Dallas Mavericks (22 GP)", "Los Angeles Lakers (27 GP)"])
+
+        def games_card():
+            html = " ".join(item.proto.body for item in at.get("html"))
+            return re.search(r"<b>GP</b><strong>([^<]+)</strong>", html).group(1)
+
+        self.assertEqual(games_card(), "49")
+        lakers = stints.query("player_id == @luka and team_id == 1610612747").iloc[0]
+        at.radio(key=key).set_value("Los Angeles Lakers (27 GP)").run()
+        self.assertFalse(at.exception)
+        self.assertEqual(games_card(), f"{lakers.games:.0f}")
+        self.assertTrue(any("Los Angeles Lakers stint only" in item.value for item in at.info))
+        for lens in ("Shooting", "Defense & Rebounding", "Playmaking"):
+            at.button_group(key="scout_lens").set_value(lens).run()
+            self.assertFalse(at.exception)
+
+        single = seasons.query("season == '2024-25' and team_id != 0").groupby("player_id").filter(lambda rows: len(rows) == 1)
+        at.selectbox(key="scout_player").set_value(int(single.nlargest(1, "pra_pg").player_id.iloc[0])).run()
+        self.assertFalse(any((radio.key or "").startswith("scout_view") for radio in at.radio))
 
     def test_evaluation_downloads_are_csv(self):
         from io import StringIO
