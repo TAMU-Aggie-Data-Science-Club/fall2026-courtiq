@@ -343,7 +343,8 @@ def bundle(name, version):
 
 
 @st.cache_data(show_spinner=False)
-def ranks(version, season, lens, min_games, ratings_modified, _league):
+def ranks(version, season, lens, min_games, ratings_modified, _league, view=None):
+    """view=(player_id, team_id) when one player's full season is swapped for a team stint."""
     return scouting.rankings(_league, season, lens, min_games=min_games)
 
 
@@ -704,6 +705,37 @@ def scouting_player_order(pool):
     return latest.set_index("player_id").player_name.to_dict()
 
 
+@st.cache_data(show_spinner=False)
+def scouting_stint_starts(version):
+    """First game date of every player-season-team stint, to list traded players' teams in order."""
+    frames = []
+    path = APP / "player_games.csv.gz"
+    if path.exists():
+        frames.append(pd.read_csv(path, usecols=["player_id", "team_id", "season", "date"], parse_dates=["date"]))
+    history = historical_game_log("player_games")
+    if history is not None:
+        frames.append(history[["player_id", "team_id", "season", "date"]])
+    if not frames:
+        return {}
+    return pd.concat(frames).groupby(["player_id", "season", "team_id"]).date.min().to_dict()
+
+
+def scouting_view(pid, season, player_stints, team_names, version):
+    """For a player with several teams in the season: full season (0) or one team stint (team_id)."""
+    if len(player_stints) < 2:
+        return 0
+    starts = scouting_stint_starts(version)
+    ordered = sorted(player_stints.itertuples(),
+                     key=lambda stint: (starts.get((pid, season, stint.team_id), pd.Timestamp.max), -stint.minutes))
+    labels = {0: "Full season"}
+    for stint in ordered:
+        labels[stint.team_id] = f"{team_names.get(stint.team_id, f'Team {stint.team_id}')} ({stint.games:.0f} GP)"
+    return st.radio(
+        "View", list(labels), format_func=labels.get, horizontal=True, key=f"scout_view_{pid}_{season}",
+        help="This player played for more than one team this season. View the whole season or one team stint.",
+    )
+
+
 def scouting_page(seasons, teams, manifest):
     st.html(SCOUT_STYLE)
     st.header("Scouting Lab")
@@ -753,26 +785,34 @@ def scouting_page(seasons, teams, manifest):
     min_games = 5 if provisional else 20
     stints = season_rows[season_rows.team_id.ne(0)]
     team_ids = sorted(stints.team_id.unique(), key=lambda tid: team_names.get(tid, str(tid)))
+    player_stints = stints[stints.player_id.eq(pid)]
+    version = manifest["version"]
+    view = scouting_view(pid, season, player_stints, team_names, version)
     scouting_freshness(season, manifest)
     st.caption("The team filter finds players who appeared for that team since 2015–16. Seasons list only the "
-               "years the player appeared. Stats combine all teams played for, and ranks compare across the "
-               "league in the selected season.")
+               "years the player appeared. Players traded during a season can be viewed for the full season or "
+               "one team stint, and ranks compare across the league in the selected season.")
 
+    full_league = league
+    view_key = (int(pid), int(view)) if view else None
+    if view:
+        stint_row = player_stints[player_stints.team_id.eq(view)]
+        league = pd.concat([league[league.player_id.ne(pid)], stint_row], ignore_index=True)
     row = league[league.player_id.eq(pid)].iloc[0]
-    version = manifest["version"]
     ratings_path = APP / "scouting_ratings.csv.gz"
     ratings_modified = ratings_path.stat().st_mtime_ns if ratings_path.exists() else None
-    all_around = ranks(version, season, "All-Around", min_games, None, league).query("player_id == @pid")
+    all_around = ranks(version, season, "All-Around", min_games, None, league, view_key).query("player_id == @pid")
     defense_league = scouting_defense_cohort(league, ratings_modified)
     defense_row = defense_league[defense_league.player_id.eq(pid)].iloc[0]
-    defense = ranks(version, season, scouting.DEFENSE_LENS, min_games, ratings_modified, defense_league).query("player_id == @pid")
+    defense = ranks(version, season, scouting.DEFENSE_LENS, min_games, ratings_modified, defense_league,
+                    view_key).query("player_id == @pid")
     if provisional:
         badges, defensive_badges = [], []
         all_around_summary = scouting.scouting_summary(all_around, row.player_name)
     else:
         badges, all_around_summary = scouting.report(all_around, row.player_name)
         defensive_badges = scouting.defensive_badges(defense)
-    player_team_ids = set(stints.loc[stints.player_id.eq(pid), "team_id"])
+    player_team_ids = {view} if view else set(player_stints.team_id)
     season_teams = []
     for tid in team_ids:
         if tid not in player_team_ids:
@@ -784,7 +824,12 @@ def scouting_page(seasons, teams, manifest):
             f'style="--team-accent:{accent}"></span>{name}</span>'
         )
     chips = []
-    position, position_detail = scouting.starting_position(defense_row)
+    # Position is a player trait, so it always comes from the full season (stints lack start counts).
+    position_row = defense_row
+    if view:
+        full_defense = scouting_defense_cohort(full_league, ratings_modified)
+        position_row = full_defense[full_defense.player_id.eq(pid)].iloc[0]
+    position, position_detail = scouting.starting_position(position_row)
     identity = " · ".join(part for part in (" / ".join(season_teams), escape(position)) if part)
     identity_line = f'<p class="scout-team-position">{identity}</p>' if identity else ""
     for badge in badges:
@@ -818,6 +863,18 @@ def scouting_page(seasons, teams, manifest):
         "stats rank higher values first. Defensive Rating and Foul Avoidance rank lower raw values "
         "first, and volume stats show how often something happens."
     )
+    if view:
+        team = team_names.get(view, f"Team {view}")
+        st.info(
+            f"**{team} stint only.** These stats and percentiles use only {row.player_name}'s games with the "
+            f"{team}. Everyone else is compared on full seasons. Defensive and net ratings are only available "
+            "for the full season."
+        )
+        if row.games < min_games:
+            st.warning(
+                f"This stint has {row.games:.0f} games, fewer than the {min_games} needed to rank, so its "
+                "percentiles are unranked. Switch to **Full season** to rank the whole year."
+            )
     if provisional:
         st.warning(
             "**Early-season rankings.** The minimum to qualify drops from 20 games played to 5, "
@@ -839,11 +896,10 @@ def scouting_page(seasons, teams, manifest):
         report_title = "Defensive scouting report"
         summary = scouting.defense_report(breakdown, row.player_name)
     elif lens != "All-Around":
-        breakdown = ranks(version, season, lens, min_games, None, league).query("player_id == @pid")
+        breakdown = ranks(version, season, lens, min_games, None, league, view_key).query("player_id == @pid")
         report_title = f"{lens} scouting report"
         summary = scouting.scouting_summary(breakdown, row.player_name)
-    player_stints = stints[stints.player_id.eq(pid)]
-    primary_stint = player_stints.nlargest(1, "minutes")
+    primary_stint = player_stints[player_stints.team_id.eq(view)] if view else player_stints.nlargest(1, "minutes")
     color = team_color(teams, primary_stint.team_id.iloc[0]) if not primary_stint.empty else "#b54b1c"
     show_chart(
         scouting.radar(breakdown, color=color, show_crowns=not provisional, player_name=row.player_name,
@@ -1025,6 +1081,18 @@ def impact_league_comparison(season_rows, teams, pid, tid, min_games=20):
                highlight=leaders.selected.tolist(), gap_before=len(top) if outside_top else None)
 
 
+def impact_player_order(stints, version):
+    """On/Off players in the Scouting Lab order (PRA per game in each player's latest season).
+    Players without a box-score season fall to the end, ordered by on-court minutes."""
+    seasons = table("player_season", version)
+    pool = scouting.canonical(seasons[seasons.season_start.ge(2015) & seasons.player_id.isin(stints.player_id)])
+    players = scouting_player_order(pool)
+    rest = stints[~stints.player_id.isin(players)].sort_values(
+        ["season_start", "minutes_on", "player_name"], ascending=[False, False, True])
+    players.update(rest.drop_duplicates("player_id").set_index("player_id").player_name.to_dict())
+    return players
+
+
 def impact_page(impacts, teams, manifest):
     from html import escape
 
@@ -1053,18 +1121,13 @@ def impact_page(impacts, teams, manifest):
         help="Find players who appeared for this team in any season since 2015–16.",
     )
     stints_for_search = recent.loc[recent.team_id.eq(team_filter)] if team_filter else recent
-    ordered = stints_for_search.assign(completed_season=stints_for_search.season_start.eq(completed_start))
-    ordered = ordered.sort_values(
-        ["completed_season", "season_start", "minutes_on", "player_name"],
-        ascending=[False, False, False, True],
-    )
-    players = ordered.drop_duplicates("player_id").set_index("player_id").player_name.to_dict()
+    players = impact_player_order(stints_for_search, version)
     options = list(players)
     pid = player_col.selectbox(
         "Search player", options, index=kept_index("impact_player", options),
         format_func=players.get, key="impact_player",
-        help="Players from the latest completed season come first, ordered by on-court minutes in a team stint. "
-             "Players from other seasons are listed by most recent season, then minutes.",
+        help="Sorted by points + rebounds + assists per game in each player's latest season, "
+             "the same order as the Scouting Lab.",
     )
     available = sorted(recent.loc[recent.player_id.eq(pid), "season"].unique(), reverse=True)
     completed = [s for s in available if completed_start is None or int(s[:4]) <= completed_start]
